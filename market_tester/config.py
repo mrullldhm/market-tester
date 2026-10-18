@@ -19,6 +19,8 @@ DATA_DIR = ROOT / "data"
 BARS_DIR = DATA_DIR / "processed" / "ohlcv-1m"
 DEFINITIONS_FILE = DATA_DIR / "processed" / "definitions" / "cl_contracts.parquet"
 EIA_RELEASES_FILE = DATA_DIR / "reference" / "eia_releases.csv"
+EXPERIMENTS_DIR = ROOT / "experiments"  # in git: ledger, pre-registrations, reports
+LEDGER_FILE = EXPERIMENTS_DIR / "LEDGER.csv"
 
 # Root = letters before the month code + year digit(s): "CLZ6" -> "CL", "MCLZ6" -> "MCL".
 # Continuous symbols ("CL.v.0") have the root before the first dot.

@@ -18,8 +18,65 @@ already looked at.
 |---|---|
 | `market_tester/config.py` | market (CL), tick $0.01 = $10, cost baseline, data paths, CL-only guard |
 | `market_tester/data.py` | `load_bars(years, continuous)`, `is_roll` flag, `check_same_contract` |
+| `market_tester/sessions.py` | ET clock, CME trading day (18:00 ET start), EIA ±15 min blackout |
+| `market_tester/periods.py` | `DEV` / `HOLDOUT` (fixed 2026-10-18), `load_period`; holdout needs a live prereg token |
+| `market_tester/ledger.py` | append-only `experiments/LEDGER.csv` (every run, config count per family, holdout look); `experiments/trials/` per-config Sharpe |
+| `market_tester/prereg.py` | freeze a holdout test; `open_run` opens the holdout once, ever |
+| `market_tester/strategy.py` | `Signals`, `Strategy` protocol, `per_contract`, session helpers |
+| `market_tester/engine.py` | generic numba 1-lot simulator: fill, stop/target, roll, EIA, cost rules |
+| `market_tester/metrics.py` | per-trade / per-day numbers, by year / side, drawdown |
+| `market_tester/stats.py` | day-clustered t, block bootstrap CI, Monte Carlo (risk), deflated Sharpe, Romano-Wolf, SPA, PBO |
+| `market_tester/baseline.py` | random-entry baseline (same week, minute, side, exits) |
+| `market_tester/optimize.py` | guarded grid (parallel), plateau pick, anchored walk-forward |
+| `market_tester/report.py` | `evaluate` (dev, all gates, report + ledger) and `evaluate_holdout` |
+| `market_tester/validate.py` | engine proofs: coin flip, planted edge, null control |
+| `market_tester/toys.py` | toy strategies for the proofs (not research ideas) |
+| `experiments/` | ledger, pre-registrations, reports (in git) |
 | `tests/` | `pytest` (data tests skip if `data/` is missing) |
 | `LESSONS.md` | everything worth keeping from the old `propfirm` repo |
+
+## Periods (fixed 2026-10-18, before any strategy test)
+| Period | Trading days | Use |
+|---|---|---|
+| dev | 2010-06-07 .. 2023-12-31 | build, tune (guarded grid), walk-forward |
+| holdout | 2024-01-01 .. 2026-10-13 | one run per pre-registered frozen config (`prereg.open_run`) |
+| forward | after 2026-10-13 | paper trading |
+
+## Testing a strategy
+```python
+from market_tester.report import evaluate
+r = evaluate(MyStrategy(), {"param": [1, 2, 3]}, item_id="S001", family="orb", hypothesis="...", n_jobs=6)
+```
+`family` names the research idea: every variant of one idea shares it, so trials add up across renamed
+items. A dev run always covers the whole dev period with the $24.02 baseline (or worse) and default (or
+stricter) gates; only its PASS makes a candidate. `kind="exploratory"` allows `years=[...]` for a quick
+partial look: trials still count, verdict is `EXPLORATORY-*`, never a candidate. `evaluate` logs a `dev_start` row (config count) before it loads data, loads dev bars, runs the
+grid, picks by plateau-smoothed Sharpe, and gates the pick:
+
+| Gate | Default | Answers |
+|---|---|---|
+| trades | >= 300 | enough sample |
+| net $/trade | > 0 | profitable after $24.02 round trip |
+| Romano-Wolf p | <= 0.05 | real inside the grid family |
+| deflated Sharpe | >= 0.95 | beats best-of-N luck, N = every config ever run for the item |
+| random-entry p | <= 0.05 | entries beat random entries (same week, minute, side, exits) |
+| walk-forward OOS | > 0 | picks made only from earlier years still earn |
+| PBO | <= 0.3 | in-sample best is not usually an OOS loser |
+| 2019-23 block | > 0 | edge has not decayed |
+| 2 tick slippage | > 0 | survives worse fills |
+| look-ahead | unchanged | signal at a cut bar does not change when the future is removed |
+
+Also reported: day-clustered t, block-bootstrap CI per trade, Monte Carlo drawdown (trade reshuffle and
+resample: risk only, never evidence of edge), by year / side, exits. PASS on dev = candidate. Then:
+Codex review + replication, `report.register_holdout(spec, strategy)` (owner approval, Codex review id;
+freezes code, strategy source + state, config, holdout files; gates may only get stricter), then
+`report.evaluate_holdout(strategy, path)` once.
+
+Strategy rules: signals causal and stateless (no fitting over the sample; objects with `fit` are refused),
+indicators per contract (`per_contract`). The holdout lock guards the tester's code path only: strategy
+code must not read data files itself.
+
+Engine proofs: `python -m market_tester.validate` (coin flip, planted edge PASS, null control FAIL).
 
 ## Data (`data/`, not in git, ~1.5 GB)
 | Path | What |
@@ -46,10 +103,9 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 `.env` holds `DATABENTO_API_KEY` and `MASSIVE_API_KEY` (only needed to buy or re-download data).
 
 ## Roadmap
-1. Decide and write down the holdout period (see `LESSONS.md` section 5) and start an append-only
-   experiment ledger: hypothesis, configurations tried, periods accessed, result.
-2. Build a small backtest engine with the fill and cost rules from `LESSONS.md`; Codex reviews it.
-3. Prove the engine: random-entry baseline loses exactly the cost; a planted edge is found.
-4. Test strategy ideas one at a time, pre-registered, Codex replicates.
+1. ~~Holdout written down, ledger started~~ (2026-10-18, `experiments/LEDGER.csv` D001).
+2. ~~Backtest engine with the fill and cost rules~~; Codex review.
+3. ~~Engine proofs: random entries lose the cost, planted edge found, null rejected~~; Codex replication.
+4. Test strategy ideas one at a time with `evaluate`, Codex replicates, then one holdout run.
 5. Forward / paper test the survivor.
 6. Trading bot.

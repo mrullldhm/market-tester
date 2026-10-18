@@ -1,0 +1,192 @@
+{
+  "item_id": "V002",
+  "hypothesis": "toy on clean bars (null control)",
+  "strategy": "market_tester.toys:MorningMomentum",
+  "kind": "synthetic",
+  "period": "2010-06-07..2023-12-29",
+  "grid": {
+    "minute": [
+      598
+    ],
+    "anchor": [
+      510,
+      540,
+      570
+    ],
+    "hold": [
+      50,
+      60,
+      70
+    ]
+  },
+  "n_configs": 9,
+  "n_trials": 9,
+  "pick": {
+    "minute": 598,
+    "anchor": 540,
+    "hold": 60
+  },
+  "slip_ticks": 1,
+  "summary": {
+    "trades": 3456,
+    "days": 3491,
+    "trades_per_year": 249.47350329418506,
+    "net_usd_per_trade": -15.738749999999982,
+    "gross_ticks_per_trade": 0.828125,
+    "net_ticks_per_trade": -1.171875,
+    "total_net_usd": -54393.11999999994,
+    "win_rate": 0.47280092592592593,
+    "profit_factor": 0.9195754037810607,
+    "sharpe_annual": -0.4751252377223253,
+    "max_drawdown_usd": 78035.95999999646,
+    "long_share": 0.49710648148148145,
+    "exits": {
+      "time": 3456
+    }
+  },
+  "dsr": {
+    "dsr": 0.007113752048633293,
+    "sr": -0.029934364351001365,
+    "sr0": 0.013858687014645456,
+    "n_trials": 9,
+    "n_obs_eff": 3133.615624591511
+  },
+  "romano_wolf_p_pick": 0.9960079840319361,
+  "spa_p": 1.0,
+  "pbo": {
+    "pbo": 0.3187257187257187,
+    "splits": 12870,
+    "logit_median": 1.3862943611198908
+  },
+  "clustered": {
+    "mean": -15.738749999999982,
+    "se": 8.89992081393246,
+    "t": -1.7684146105391876,
+    "p_one_sided": 0.9615041921014535,
+    "n": 3456,
+    "days": 3456
+  },
+  "bootstrap": {
+    "per_day": -15.580956745918058,
+    "per_day_ci": [
+      -35.08306946433685,
+      3.426376253222586
+    ],
+    "per_trade": -15.738749999999984,
+    "per_trade_ci": [
+      -35.42536373314139,
+      3.458541406555297
+    ],
+    "p_per_trade_le_0": 0.952,
+    "conf": 0.95,
+    "n_boot": 500,
+    "mean_block_days": 5.0
+  },
+  "monte_carlo": {
+    "trades": 3456,
+    "actual_max_dd": 78035.95999999646,
+    "shuffle_max_dd": {
+      "p50": 67524.34999999739,
+      "p95": 82112.31599999624,
+      "p99": 89171.25779999889
+    },
+    "resample_max_dd": {
+      "p50": 68743.14999999912,
+      "p95": 111209.4929999971,
+      "p99": 129812.78380000129
+    },
+    "resample_total": {
+      "p5": -103319.11999999994,
+      "p50": -55513.11999999994,
+      "p95": -6069.61999999997
+    },
+    "p_total_le_0": 0.963
+  },
+  "random_entry": {
+    "draws": 100,
+    "real_net_usd_per_trade": -15.738749999999982,
+    "random_net_usd_per_trade_mean": -25.414749270981712,
+    "random_p5_p95": [
+      -38.200386241977924,
+      -10.469999295072284
+    ],
+    "random_trades_median": 2335,
+    "real_trades": 3456,
+    "p": 0.13861386138613863
+  },
+  "lookahead": {
+    "ok": true,
+    "cuts": 12,
+    "changed_at_bars": []
+  },
+  "walk_forward": {
+    "trades": 2785,
+    "total_net_usd": -37625.69999999995,
+    "net_usd_per_trade": -13.510125673249535
+  },
+  "gates": [
+    {
+      "gate": "trades",
+      "value": 3456,
+      "rule": ">= 100",
+      "pass": true
+    },
+    {
+      "gate": "net $/trade",
+      "value": -15.738749999999982,
+      "rule": "> 0.0",
+      "pass": false
+    },
+    {
+      "gate": "Romano-Wolf p (pick)",
+      "value": 0.9960079840319361,
+      "rule": "<= 0.05",
+      "pass": false
+    },
+    {
+      "gate": "deflated Sharpe",
+      "value": 0.007113752048633293,
+      "rule": ">= 0.95",
+      "pass": false
+    },
+    {
+      "gate": "random-entry p",
+      "value": 0.13861386138613863,
+      "rule": "<= 0.05",
+      "pass": false
+    },
+    {
+      "gate": "walk-forward OOS net $/trade",
+      "value": -13.510125673249535,
+      "rule": "> 0.0",
+      "pass": false
+    },
+    {
+      "gate": "PBO",
+      "value": 0.3187257187257187,
+      "rule": "<= 0.3",
+      "pass": false
+    },
+    {
+      "gate": "net $/trade 2019-2023",
+      "value": -0.7048673946957746,
+      "rule": "> 0",
+      "pass": false
+    },
+    {
+      "gate": "net $/trade at 2 tick slip",
+      "value": -35.73874999999998,
+      "rule": "> 0",
+      "pass": false
+    },
+    {
+      "gate": "look-ahead (signal at cut)",
+      "value": true,
+      "rule": "unchanged",
+      "pass": true
+    }
+  ],
+  "verdict": "FAIL",
+  "code_sha256": "1b70a1143f32f0d7d1bf742dbf3c82e770d14bdb0529c0e2fea8d5804541021f",
+  "seconds": 18.8
+}

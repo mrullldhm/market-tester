@@ -84,7 +84,8 @@ Deleting code does not un-see data. Honest status:
 | 2022-01 .. 2026-10 | touched by EMA x VWAP holdout, ACD signal test and VWAP Break full run (P&L by year). **Quasi-clean**: fine for a new, unrelated idea, not for EMA/ACD/VWAP-break variants |
 | after 2026-10-13 | never seen. Only truly clean data = future data (forward / paper trading) |
 
-**Rule for market-tester:** choose and write down the holdout before the first test, and log every look.
+**Rule for market-tester:** holdout fixed 2026-10-18 before any test: dev = trading days 2010-06-07 .. 2023-12-31,
+holdout = 2024-01-01 .. 2026-10-13 (`periods.py`, ledger D001). Every look is a ledger row; one run per prereg.
 
 ## 6. Method lessons
 
