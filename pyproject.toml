@@ -1,0 +1,9 @@
+[project]
+name = "market-tester"
+version = "0.1.0"
+description = "Backtesting research to find a profitable CL (Light Crude Oil futures) strategy"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
