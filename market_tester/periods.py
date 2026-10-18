@@ -13,7 +13,7 @@ import pandas as pd
 from . import prereg
 from .config import BARS_DIR, EIA_RELEASES_FILE
 from .data import FRONT, load_bars
-from .sessions import add_time_columns, eia_blackout
+from .sessions import add_time_columns, eia_blackout, eia_release_bar
 
 
 class HoldoutLocked(PermissionError):
@@ -49,7 +49,8 @@ def select_period(bars: pd.DataFrame, period: Period) -> pd.DataFrame:
 
 
 def load_period(period: Period, token=None, years: list[int] | None = None, continuous: str = FRONT) -> pd.DataFrame:
-    """Front-month bars of a period with time columns and `eia_block`. The holdout needs a live RunToken.
+    """Front-month bars of a period with time columns, `eia_block` and `eia_release` (bar starting at a confirmed
+    release). The holdout needs a live RunToken.
 
     `years` narrows a dev load (e.g. a quick check on [2018, 2019]); it can never reach outside the period.
     Only the canonical DEV and HOLDOUT objects are accepted, so a home-made Period cannot unlock dates.
@@ -64,4 +65,5 @@ def load_period(period: Period, token=None, years: list[int] | None = None, cont
         raise ValueError(f"years {years} are outside {period.name}")
     bars = add_time_columns(load_bars(wanted, continuous=continuous))
     bars = select_period(bars, period)
-    return bars.assign(eia_block=eia_blackout(bars["ts_event_utc"]))
+    ts = bars["ts_event_utc"]
+    return bars.assign(eia_block=eia_blackout(ts), eia_release=eia_release_bar(ts))

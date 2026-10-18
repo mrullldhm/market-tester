@@ -60,6 +60,18 @@ Dev period 2010-06 .. 2021-12 unless stated. Costs as section 2.
 | H028 | RB/HO/BZ vs CL at settlement (2015-16) | 3 | −0.04 to −0.65 gross ticks | no edge |
 | H033 | Top-of-book queue imbalance at 14:29 | spec only | never run | reset before run |
 | S003 | ML ceiling: ridge / elastic net / boosted trees on ~25 OHLCV features, 8 times x 6 horizons | 432 | 0 significant after costs (Romano-Wolf min p 0.96) | rules out ~8+ tick edges at those times only |
+| P101 | Intraday momentum (Gao 2018), first half-hour -> 14:00-14:29 | 1 | -$18.45/trade, gross +$5.57 | gross edge < cost |
+| P102 | Noise-area momentum (Zarattini 2024) | 1 | +$5.14/trade, p 0.34, 2019-23 -$17.20 | entries beat random (Holm p 0.04) but edge < 1 round trip; decayed |
+| P103 | EIA half-hour momentum (Wen 2023) -> last half-hour | 1 | -$17.29/trade | gross edge < cost |
+| P104 | Gap fade 08:59 vs prior 14:29, >= 20 ticks | 1 | -$14.59/trade | gross edge < cost |
+| P105 | Bollinger(20,2) 5m reversion | 1 | -$34.71/trade, gross -$10.69 | loses before costs |
+| P106 | RSI(2) 5m (Connors) | 1 | -$20.63/trade | gross edge < cost |
+| P107 | Floor pivot R1/S1 fade | 1 | -$49.16/trade, gross -$28.29 | loses before costs |
+| P108 | Turtle Soup intraday (prior-day extreme) | 1 | -$20.02/trade | entries beat random (Holm p 0.025) but edge < cost |
+| P109 | Donchian 20/10 5m + 2N stop | 1 | -$13.35/trade | gross edge < cost |
+| P110 | MACD(12,26,9) 5m cross | 1 | -$14.26/trade | gross edge < cost |
+
+P101-P110: dev 2010-06..2023-12 only, one frozen config each, replicated by Codex (`experiments/P10/`).
 
 Walk-forward (pick each year from earlier years only) never found a qualifying config for strategies 1-8.
 

@@ -151,3 +151,39 @@ def test_session_helpers():
     bars = make_bars([FLAT_BAR] * 6)
     assert flat_before(bars, 9 * 60 + 3).tolist() == [False, False, True, False, False, False]
     assert first_bar_at(bars, 9 * 60 + 2).tolist() == [False, False, True, False, False, False]
+
+
+def test_side_specific_exits():
+    bars = make_bars([FLAT_BAR, (1000, 1000, 1000, 1000), (1004, 1004, 1004, 1004), (1001, 1001, 1001, 1001),
+                      (1001, 1001, 1001, 1001), (1002, 1002, 1002, 1002)])
+    # long from bar 1: exit_short at bar 1 is ignored, exit_long at bar 2 closes it at bar 3 open
+    long_ = run(Market.from_bars(bars), Signals(np.array([1, 0, 0, 0, 0, 0]), exit_short=np.array([0, 1, 0, 0, 0, 0]),
+                                                exit_long=np.array([0, 0, 1, 0, 0, 0])))
+    assert long_["exit_bar"].tolist() == [3] and long_["reason"].tolist() == ["signal"]
+    # short from bar 1: exit_long is ignored, exit_short at bar 3 closes it at bar 4 open
+    short = run(Market.from_bars(bars), Signals(np.array([-1, 0, 0, 0, 0, 0]), exit_long=np.array([0, 1, 1, 0, 0, 0]),
+                                                exit_short=np.array([0, 0, 0, 1, 0, 0])))
+    assert short["exit_bar"].tolist() == [4] and short["gross_ticks"].tolist() == [-1]
+
+
+def test_price_level_stop_and_target():
+    bars = make_bars([FLAT_BAR, (1000, 1000, 1000, 1000), (1000, 1006, 1000, 1006), (1006, 1006, 1006, 1006)])
+    # long at 1000, absolute target 1005 needs a trade through 1005: 1006 high fills at 1005
+    t = one_trade(bars, Signals(sides(4, 0), target_price=np.array([1005, 0, 0, 0]),
+                                stop_price=np.array([990, 0, 0, 0])))
+    assert t["reason"] == "target" and t["exit_ticks"] == 1005
+    # entry open 1000 is already at / beyond the level: no trade
+    assert run(Market.from_bars(bars), Signals(sides(4, 0), stop_price=np.array([1000, 0, 0, 0]))).empty
+    assert run(Market.from_bars(bars), Signals(sides(4, 0, -1), target_price=np.array([1001, 0, 0, 0]))).empty
+    with pytest.raises(ValueError):
+        run(Market.from_bars(bars), Signals(sides(4, 0), stop_ticks=5, stop_price=990))
+
+
+def test_day_end_flat_and_strict_fill_delay():
+    bars = make_bars([FLAT_BAR] * 5, minutes=[0, 1, 2, 4, 5])
+    bars.loc[2:, "trading_day"] = bars["trading_day"].iloc[0] + pd.Timedelta(days=1)
+    t = one_trade(bars, Signals(sides(5, 0), flat_day_end=True))
+    assert t["exit_bar"] == 1 and t["reason"] == "flat"
+    # signal at bar 2, next bar 2 minutes later: allowed by default, refused with a 1-minute limit
+    assert len(run(Market.from_bars(bars), Signals(sides(5, 2)))) == 1
+    assert run(Market.from_bars(bars), Signals(sides(5, 2), max_fill_delay_min=1)).empty

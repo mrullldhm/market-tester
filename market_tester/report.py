@@ -44,20 +44,23 @@ strategy_id = prereg.strategy_id
 
 def _signal_arrays(sig: Signals, n: int) -> list[np.ndarray]:
     return [np.broadcast_to(np.asarray(0 if x is None else x), (n,))
-            for x in (sig.side, sig.stop_ticks, sig.target_ticks, sig.hold_minutes, sig.exit, sig.flat)]
+            for x in (sig.side, sig.stop_ticks, sig.target_ticks, sig.hold_minutes, sig.exit, sig.flat,
+                      sig.exit_long, sig.exit_short, sig.stop_price, sig.target_price)]
 
 
 def lookahead_check(strategy, bars: pd.DataFrame, params: dict, n_cuts: int = 30, seed: int = 0,
                     full: Signals | None = None) -> dict:
-    """Cut the future off after bar k: every signal array (side, stop, target, hold, exit, flat) on bars
-    0..k must be identical to the full run. Two thirds of the cuts land on decision bars (an entry, exit or
-    flat signal), where a short leak shows; a prefix compare also catches fits over the whole sample.
+    """Cut the future off after bar k: every signal array (side, stop, target, hold, exit, flat, exit_long,
+    exit_short, stop / target price) on bars 0..k must be identical to the full run. Two thirds of the cuts
+    land on decision bars (an entry, exit or flat signal), where a short leak shows; a prefix compare also
+    catches fits over the whole sample.
     A spot check, not a proof: strategies must also be causal by construction."""
     n = len(bars)
     full = strategy.signals(bars, **params) if full is None else full
     ref = _signal_arrays(full, n)
     rng = np.random.default_rng(seed)
-    decision = np.flatnonzero(((ref[0] != 0) | ref[4].astype(bool) | ref[5].astype(bool))[: n - 1])
+    decision = np.flatnonzero(((ref[0] != 0) | ref[4].astype(bool) | ref[5].astype(bool) | ref[6].astype(bool)
+                               | ref[7].astype(bool))[: n - 1])
     k_dec = min(len(decision), (2 * n_cuts) // 3)
     cuts = set(int(c) for c in rng.choice(decision, k_dec, replace=False)) if k_dec else set()
     pool = np.setdiff1d(np.arange(n // 10, n - 1), np.fromiter(cuts, np.int64, len(cuts)))

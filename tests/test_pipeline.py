@@ -273,3 +273,20 @@ def test_dev_run_cannot_narrow_years_but_exploratory_can(tmp_experiments, monkey
     assert r["verdict"].startswith("EXPLORATORY-")
     assert ledger.configs_tried("tod") == 2
     assert ledger.read()["kind"].tolist() == ["exploratory", "exploratory_result"]
+
+
+def test_random_entries_move_price_levels_as_distances(synth):
+    from market_tester.baseline import random_entry_signals
+    market = Market.from_bars(synth)
+    side = first_bar_at(synth, 10 * 60).astype(np.int64)
+    close = synth["close_ticks"].to_numpy()
+    sig = Signals(side, stop_price=np.where(side != 0, close - 30, 0), target_price=np.where(side != 0, close + 50, 0))
+    trades = run(market, sig)
+    e = trades["entry_bar"].to_numpy()
+    want_stop = sorted(trades["entry_ticks"].to_numpy() - (close[e - 1] - 30))
+    want_target = sorted(close[e - 1] + 50 - trades["entry_ticks"].to_numpy())
+    rnd = random_entry_signals(market, trades, sig, np.random.default_rng(0))
+    i = np.flatnonzero(rnd.side)
+    assert len(i) == len(trades)  # every weekday has a 10:00 bar
+    assert sorted(rnd.stop_ticks[i]) == want_stop and sorted(rnd.target_ticks[i]) == want_target
+    assert (np.asarray(rnd.stop_price) == 0).all() and (np.asarray(rnd.target_price) == 0).all()

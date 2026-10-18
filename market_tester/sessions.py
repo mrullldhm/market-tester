@@ -23,9 +23,12 @@ def add_time_columns(bars: pd.DataFrame) -> pd.DataFrame:
     return bars.assign(ts_et=ts_et, et_minute=et_minute, trading_day=trading_day)
 
 
-def eia_release_times(path=EIA_RELEASES_FILE) -> pd.DatetimeIndex:
-    """Every listed release time in UTC. Unconfirmed rows are kept: blocking a candidate time costs little."""
+def eia_release_times(path=EIA_RELEASES_FILE, confirmed_only: bool = False) -> pd.DatetimeIndex:
+    """Listed release times in UTC. Unconfirmed rows are kept by default: blocking a candidate time costs little.
+    `confirmed_only` keeps rows whose release was confirmed (for strategies that trade the release)."""
     rel = pd.read_csv(path, dtype=str)
+    if confirmed_only:
+        rel = rel[rel["status"] == "confirmed"]
     et = pd.to_datetime(rel["date"] + " " + rel["time_et"]).dt.tz_localize(ET)
     return pd.DatetimeIndex(et.dt.tz_convert("UTC")).sort_values()
 
@@ -41,3 +44,10 @@ def eia_blackout(ts_utc: pd.Series, minutes: int = EIA_BLACKOUT_MINUTES, release
     i = np.searchsorted(r, t - w, side="left")  # first release >= t - w
     i = np.minimum(i, len(r) - 1)
     return np.abs(r[i] - t) <= w
+
+
+def eia_release_bar(ts_utc: pd.Series, releases=None) -> np.ndarray:
+    """True for bars that start exactly at a confirmed release time."""
+    releases = eia_release_times(confirmed_only=True) if releases is None else releases
+    t = ts_utc.to_numpy(dtype="datetime64[ns]").astype(np.int64)
+    return np.isin(t, np.asarray(releases.as_unit("ns").asi8, dtype=np.int64))

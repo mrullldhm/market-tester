@@ -2,6 +2,8 @@
 
 - signal at bar t close, market entry at bar t+1 open; no entry if bar t+1 is a new contract, an EIA
   blackout bar, the last bar of a contract, or more than `max_fill_delay_min` after bar t (stale signal);
+- stop / target are a distance from the entry fill or an absolute price level fixed at the signal; an entry
+  whose open has already reached a price level is skipped;
 - stop = market order: gap through it fills at the open, else at the stop price; slipped;
 - target = limit order: needs a 1-tick trade-through, fills at the target price, never slipped;
 - stop and target inside the same bar = stop;
@@ -83,8 +85,9 @@ def _arr(x, n, dtype):
 
 
 @nb.njit(cache=True, nogil=True)
-def _simulate(ts, o, h, l, c, contract, last_bar, entry_ok, side, stop, target, hold_ns, exit_sig, flat,
-              max_delay_ns, out_i, out_j, out_side, out_in, out_out, out_slip, out_reason):
+def _simulate(ts, o, h, l, c, contract, last_bar, entry_ok, side, stop, target, stop_price, target_price, hold_ns,
+              exit_sig, exit_long, exit_short, flat, max_delay_ns, out_i, out_j, out_side, out_in, out_out, out_slip,
+              out_reason):
     n = len(ts)
     m = 0
     pos = 0
@@ -121,15 +124,20 @@ def _simulate(ts, o, h, l, c, contract, last_bar, entry_ok, side, stop, target, 
         # 2. entry at the open
         if pos == 0 and k > 0 and side[k - 1] != 0 and contract[k] == contract[k - 1] and entry_ok[k] \
                 and ts[k] - ts[k - 1] <= max_delay_ns:
-            pos = side[k - 1]
-            pos_contract = contract[k]
-            ref_in = o[k]
-            has_stop = stop[k - 1] > 0
-            has_tgt = target[k - 1] > 0
-            stop_px = ref_in - pos * stop[k - 1]
-            tgt_px = ref_in + pos * target[k - 1]
-            deadline = ts[k] + hold_ns[k - 1] if hold_ns[k - 1] > 0 else 0
-            out_i[m], out_side[m], out_in[m], out_slip[m] = k, pos, ref_in, 1
+            p = side[k - 1]
+            s_px = stop_price[k - 1] if stop_price[k - 1] > 0 else o[k] - p * stop[k - 1]
+            t_px = target_price[k - 1] if target_price[k - 1] > 0 else o[k] + p * target[k - 1]
+            s_on = stop[k - 1] > 0 or stop_price[k - 1] > 0
+            t_on = target[k - 1] > 0 or target_price[k - 1] > 0
+            # a price level the open has already reached voids the entry
+            if (not s_on or p * (o[k] - s_px) > 0) and (not t_on or p * (t_px - o[k]) > 0):
+                pos = p
+                pos_contract = contract[k]
+                ref_in = o[k]
+                has_stop, has_tgt = s_on, t_on
+                stop_px, tgt_px = s_px, t_px
+                deadline = ts[k] + hold_ns[k - 1] if hold_ns[k - 1] > 0 else 0
+                out_i[m], out_side[m], out_in[m], out_slip[m] = k, pos, ref_in, 1
         # 3. inside the bar: stop first when both are touched
         reason = -1
         if pos != 0:
@@ -150,28 +158,43 @@ def _simulate(ts, o, h, l, c, contract, last_bar, entry_ok, side, stop, target, 
                 m += 1
                 pos = 0
                 pending_exit = False
-            elif exit_sig[k]:
+            elif exit_sig[k] or (pos > 0 and exit_long[k]) or (pos < 0 and exit_short[k]):
                 pending_exit = True
     return m
 
 
 def run(market: Market, sig: Signals, max_fill_delay_min: int = 5) -> pd.DataFrame:
-    """Trades of one configuration (gross, in ticks). Apply costs with `with_costs`."""
+    """Trades of one configuration (gross, in ticks). Apply costs with `with_costs`.
+    The day-end flat uses the session calendar (like the roll close): known before the day, not a peek."""
     n = len(market)
+    if sig.max_fill_delay_min is not None:
+        if sig.max_fill_delay_min < 1:
+            raise ValueError("max_fill_delay_min must be >= 1")
+        max_fill_delay_min = min(max_fill_delay_min, sig.max_fill_delay_min)
     side = _arr(sig.side, n, np.int64)
     if not np.isin(side, (-1, 0, 1)).all():
         raise ValueError("side must be -1, 0 or +1")
     stop = _arr(sig.stop_ticks, n, np.int64)
     target = _arr(sig.target_ticks, n, np.int64)
+    stop_price = _arr(sig.stop_price, n, np.int64)
+    target_price = _arr(sig.target_price, n, np.int64)
     hold = _arr(sig.hold_minutes, n, np.int64) * NS_PER_MIN
-    if (stop < 0).any() or (target < 0).any() or (hold < 0).any():
-        raise ValueError("stop, target and hold must be >= 0 (0 = none)")
+    if (stop < 0).any() or (target < 0).any() or (hold < 0).any() or (stop_price < 0).any() or (target_price < 0).any():
+        raise ValueError("stop, target, their prices and hold must be >= 0 (0 = none)")
+    if ((stop > 0) & (stop_price > 0)).any() or ((target > 0) & (target_price > 0)).any():
+        raise ValueError("give a stop / target as a distance or as a price, not both")
     exit_sig = _arr(sig.exit, n, np.bool_)
+    exit_long = _arr(sig.exit_long, n, np.bool_)
+    exit_short = _arr(sig.exit_short, n, np.bool_)
     flat = _arr(sig.flat, n, np.bool_)
+    if sig.flat_day_end:
+        day = market.trading_day
+        flat = flat | np.r_[day[1:] != day[:-1], True]
     cap = int(np.count_nonzero(side)) + 1
     out = [np.zeros(cap, np.int64) for _ in range(7)]
     m = _simulate(market.ts, market.open, market.high, market.low, market.close, market.contract,
-                  market.last_bar, market.entry_ok, side, stop, target, hold, exit_sig, flat,
+                  market.last_bar, market.entry_ok, side, stop, target, stop_price, target_price, hold, exit_sig,
+                  exit_long, exit_short, flat,
                   np.int64(max_fill_delay_min) * NS_PER_MIN, *out)
     if m < 0:
         raise RollCrossed(f"engine held a position into another contract at bar {-m - 1}")

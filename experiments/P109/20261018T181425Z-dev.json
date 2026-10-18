@@ -1,0 +1,179 @@
+{
+  "item_id": "P109",
+  "family": "donchian",
+  "hypothesis": "experiments/P10/SPEC.md rev 3, item P109 (donchian): frozen published / source-inspired rule",
+  "strategy": "market_tester.published:DonchianBreakout",
+  "kind": "dev",
+  "start_run_id": "P109-001",
+  "configs_all_families": 9,
+  "period": "2010-06-07..2023-12-29",
+  "grid": {},
+  "n_configs": 1,
+  "n_trials": 1,
+  "pick": {},
+  "slip_ticks": 1,
+  "summary": {
+    "trades": 7174,
+    "days": 3491,
+    "trades_per_year": 517.8596390718992,
+    "net_usd_per_trade": -13.349523278505705,
+    "gross_ticks_per_trade": 1.0670476721494284,
+    "net_ticks_per_trade": -0.9329523278505715,
+    "total_net_usd": -95769.47999999992,
+    "win_rate": 0.3353777529969334,
+    "profit_factor": 0.9336274228998319,
+    "sharpe_annual": -0.5318241950522988,
+    "max_drawdown_usd": 131844.42000000988,
+    "long_share": 0.5103150264845274,
+    "exits": {
+      "stop": 3221,
+      "signal": 2390,
+      "flat": 1555,
+      "roll": 8
+    }
+  },
+  "dsr": {
+    "dsr": 0.02685179405126137,
+    "sr": -0.033506574606919665,
+    "sr0": 0.0,
+    "n_trials": 1,
+    "n_obs_eff": 3466.993268029011
+  },
+  "romano_wolf_p_pick": 0.973026973026973,
+  "spa_p": NaN,
+  "pbo": {
+    "pbo": NaN,
+    "splits": 0
+  },
+  "clustered": {
+    "mean": -13.349523278505705,
+    "se": 6.7035173338286995,
+    "t": -1.991420714486488,
+    "p_one_sided": 0.976782673105167,
+    "n": 7174,
+    "days": 3445
+  },
+  "bootstrap": {
+    "per_day": -27.433251217416178,
+    "per_day_ci": [
+      -55.98374477227153,
+      0.7459215124606298
+    ],
+    "per_trade": -13.349523278505698,
+    "per_trade_ci": [
+      -26.995820320672518,
+      0.3657659165473903
+    ],
+    "p_per_trade_le_0": 0.969,
+    "conf": 0.95,
+    "n_boot": 2000,
+    "mean_block_days": 5.0
+  },
+  "monte_carlo": {
+    "trades": 7174,
+    "actual_max_dd": 131844.42000000988,
+    "shuffle_max_dd": {
+      "p50": 114028.03999999666,
+      "p95": 138023.32900000195,
+      "p99": 150035.95579999994
+    },
+    "resample_unit": "day blocks",
+    "resample_max_dd": {
+      "p50": 116173.7699999966,
+      "p95": 187834.57299999756,
+      "p99": 221595.4745999991
+    },
+    "resample_total": {
+      "p5": -174885.77399999992,
+      "p50": -95623.7999999999,
+      "p95": -13582.759999999867
+    },
+    "p_total_le_0": 0.9726
+  },
+  "random_entry": {
+    "draws": 1999,
+    "accepted": 0,
+    "real_net_usd_per_trade": -13.349523278505705,
+    "random_net_usd_per_trade_mean": NaN,
+    "random_p5_p95": [],
+    "random_trades_median": 6153,
+    "real_trades": 7174,
+    "p": NaN
+  },
+  "lookahead": {
+    "ok": true,
+    "cuts": 30,
+    "decision_cuts": 20,
+    "changed_at_bars": []
+  },
+  "walk_forward": {
+    "trades": 5924,
+    "total_net_usd": -70004.47999999992,
+    "net_usd_per_trade": -11.817096556380811
+  },
+  "gates": [
+    {
+      "gate": "trades",
+      "value": 7174,
+      "rule": ">= 300",
+      "pass": true
+    },
+    {
+      "gate": "net $/trade",
+      "value": -13.349523278505705,
+      "rule": "> 0.0",
+      "pass": false
+    },
+    {
+      "gate": "Romano-Wolf p (pick)",
+      "value": 0.973026973026973,
+      "rule": "<= 0.05",
+      "pass": false
+    },
+    {
+      "gate": "deflated Sharpe",
+      "value": 0.02685179405126137,
+      "rule": ">= 0.95",
+      "pass": false
+    },
+    {
+      "gate": "random-entry p",
+      "value": NaN,
+      "rule": "<= 0.05",
+      "pass": false
+    },
+    {
+      "gate": "walk-forward OOS net $/trade",
+      "value": -11.817096556380811,
+      "rule": "> 0.0",
+      "pass": false
+    },
+    {
+      "gate": "PBO",
+      "value": NaN,
+      "rule": "<= 0.3",
+      "pass": null
+    },
+    {
+      "gate": "net $/trade 2019-2023",
+      "value": -1.8664223385689238,
+      "rule": "> 0",
+      "pass": false
+    },
+    {
+      "gate": "net $/trade at 2 tick slip",
+      "value": -33.3495232785057,
+      "rule": "> 0",
+      "pass": false
+    },
+    {
+      "gate": "look-ahead (signals before cut)",
+      "value": true,
+      "rule": "unchanged",
+      "pass": true
+    }
+  ],
+  "verdict": "FAIL",
+  "code_sha256": "84ca3523fefc2fba6d19b1e37b77a3eca64d80ebaffcb977531282cb44e23b34",
+  "seconds": 481.7
+}

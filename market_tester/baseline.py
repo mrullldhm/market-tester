@@ -1,9 +1,10 @@
 """Random-entry baseline (LESSONS §6.2): are the strategy's ENTRIES better than random ones?
 
 Each draw permutes the trading days inside every calendar week and moves all of a day's real entries to
-its partner day: same ET minute (exact), same side, same stop / target / hold, and the strategy's own
-`exit` / `flat` rules. A bijection, so entries never collide and the count is kept unless the partner
-day has no bar at that exact minute. Draws that keep under `min_match` of the real trades are rejected.
+its partner day: same ET minute (exact), same side, same stop / target / hold (price levels as their
+distance from the real fill), and the strategy's own `exit` / `exit_long` / `exit_short` / `flat` rules. A
+bijection, so entries never collide and the count is kept unless the partner day has no bar at that exact
+minute. Draws that keep under `min_match` of the real trades are rejected.
 If the real net per trade is not above most draws, the "edge" is drift or the exit rule, not the entry.
 """
 
@@ -38,6 +39,9 @@ def random_entry_signals(market: Market, trades: pd.DataFrame, sig: Signals, rng
     n = len(market)
     stop = np.broadcast_to(np.asarray(sig.stop_ticks), (n,))
     target = np.broadcast_to(np.asarray(sig.target_ticks), (n,))
+    # absolute levels mean nothing on another day: move them as their distance from the real entry fill
+    stop_px = np.broadcast_to(np.asarray(sig.stop_price), (n,))
+    target_px = np.broadcast_to(np.asarray(sig.target_price), (n,))
     hold = np.broadcast_to(np.asarray(sig.hold_minutes), (n,))
     entry = trades["entry_bar"].to_numpy()
     partner = week_permutation(week, rng)[np.searchsorted(days, market.trading_day[entry])]
@@ -48,8 +52,11 @@ def random_entry_signals(market: Market, trades: pd.DataFrame, sig: Signals, rng
         fill = a + np.searchsorted(sess_min[a:b], sess_min[e])
         if fill <= a or fill >= b or sess_min[fill] != sess_min[e]:
             continue  # no bar at that exact minute on the partner day
-        side[fill - 1], st[fill - 1], tg[fill - 1], ho[fill - 1] = s, stop[e - 1], target[e - 1], hold[e - 1]
-    return Signals(side, st, tg, ho, exit=sig.exit, flat=sig.flat)
+        st_e = abs(stop_px[e - 1] - market.open[e]) if stop_px[e - 1] > 0 else stop[e - 1]
+        tg_e = abs(target_px[e - 1] - market.open[e]) if target_px[e - 1] > 0 else target[e - 1]
+        side[fill - 1], st[fill - 1], tg[fill - 1], ho[fill - 1] = s, st_e, tg_e, hold[e - 1]
+    return Signals(side, st, tg, ho, exit=sig.exit, exit_long=sig.exit_long, exit_short=sig.exit_short,
+                   flat=sig.flat, flat_day_end=sig.flat_day_end, max_fill_delay_min=sig.max_fill_delay_min)
 
 
 def random_entry_test(market: Market, trades: pd.DataFrame, sig: Signals, slip_ticks: float = 1,

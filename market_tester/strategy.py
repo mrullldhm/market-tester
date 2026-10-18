@@ -23,6 +23,12 @@ class Signals:
     hold_minutes: np.ndarray | int = 0  # exit at the first bar open at or after entry + hold
     exit: np.ndarray | None = None  # True at close of bar t: exit at bar t+1 open (with `side` = reversal)
     flat: np.ndarray | None = None  # True: exit at this bar's close (session flat time)
+    exit_long: np.ndarray | None = None  # as `exit`, applied only to a long position
+    exit_short: np.ndarray | None = None  # as `exit`, applied only to a short position
+    stop_price: np.ndarray | int = 0  # absolute stop level in ticks (instead of stop_ticks); 0 = none
+    target_price: np.ndarray | int = 0  # absolute target level in ticks (instead of target_ticks); 0 = none
+    flat_day_end: bool = False  # also exit at the close of each trading day's last bar (early closes)
+    max_fill_delay_min: int | None = None  # stricter stale-signal limit than the engine's, e.g. 1 = exact minute
 
 
 class Strategy(Protocol):
