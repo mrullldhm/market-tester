@@ -5,6 +5,8 @@ its partner day: same ET minute (exact), same side, same stop / target / hold (p
 distance from the real fill), and the strategy's own `exit` / `exit_long` / `exit_short` / `flat` rules. A
 bijection, so entries never collide and the count is kept unless the partner day has no bar at that exact
 minute. Draws that keep under `min_match` of the real trades are rejected.
+With an `eligible` mask (per bar, constant within a day), days are permuted only among eligible days of the
+same week, so a strategy's eligibility filter (e.g. expiry, contract checks) also holds for random entries.
 If the real net per trade is not above most draws, the "edge" is drift or the exit rule, not the entry.
 """
 
@@ -15,13 +17,21 @@ from .engine import Market, run, with_costs
 from .strategy import Signals
 
 
-def _day_index(market: Market):
+def _day_index(market: Market, eligible: np.ndarray | None = None):
     days, first = np.unique(market.trading_day, return_index=True)
     order = np.argsort(first)
     days, first = days[order], first[order]
     end = np.r_[first[1:], len(market)]
     session_minute = (market.et_minute.astype(np.int64) - 18 * 60) % 1440
     week = pd.DatetimeIndex(days).to_period("W").asi8
+    if eligible is not None:
+        eligible = np.asarray(eligible, bool)
+        if len(eligible) != len(market):
+            raise ValueError("eligible must have one value per bar")
+        day_ok = eligible[first]
+        if any(not (eligible[a:b] == ok).all() for a, b, ok in zip(first, end, day_ok)):
+            raise ValueError("eligible must be constant within a trading day")
+        week = week * 2 + day_ok  # permutation groups: (week, eligible)
     return days, first, end, session_minute, week
 
 
@@ -60,13 +70,16 @@ def random_entry_signals(market: Market, trades: pd.DataFrame, sig: Signals, rng
 
 
 def random_entry_test(market: Market, trades: pd.DataFrame, sig: Signals, slip_ticks: float = 1,
-                      n_draws: int = 200, seed: int = 0, min_match: float = 0.9, progress: bool = False) -> dict:
+                      n_draws: int = 200, seed: int = 0, min_match: float = 0.9, progress: bool = False,
+                      eligible: np.ndarray | None = None) -> dict:
     """p = share of accepted draws whose net per trade is >= the real one (+1 smoothing). nan if fewer than
     half the draws keep `min_match` of the real trade count (the null would be a different experiment)."""
     if trades.empty:
         return {"draws": 0, "p": float("nan")}
     rng = np.random.default_rng(seed)
-    index = _day_index(market)
+    index = _day_index(market, eligible)
+    if eligible is not None and not np.asarray(eligible, bool)[trades["entry_bar"].to_numpy()].all():
+        raise ValueError("a real trade entered on an ineligible day")
     real = float(trades["net_usd"].mean())
     means, counts = np.full(n_draws, np.nan), np.zeros(n_draws, np.int64)
     for d in range(n_draws):
@@ -82,4 +95,5 @@ def random_entry_test(market: Market, trades: pd.DataFrame, sig: Signals, slip_t
             "random_net_usd_per_trade_mean": float(np.nanmean(means)) if ok.any() else float("nan"),
             "random_p5_p95": [float(np.nanquantile(means, q)) for q in (0.05, 0.95)] if ok.any() else [],
             "random_trades_median": int(np.median(counts)), "real_trades": len(trades),
+            "match_rate_median": float(np.median(counts) / len(trades)), "eligible_mask": eligible is not None,
             "p": float(((means[ok] >= real).sum() + 1) / (ok.sum() + 1)) if enough else float("nan")}

@@ -8,7 +8,7 @@ from collections.abc import Iterable
 
 import pandas as pd
 
-from .config import BARS_DIR, CONTINUOUS_SYMBOLS, assert_allowed, is_cl_outright
+from .config import BARS_DIR, CONTINUOUS_SYMBOLS, DEFINITIONS_FILE, assert_allowed, is_cl_outright
 
 FRONT = "CL.v.0"
 SECOND = "CL.v.1"
@@ -77,3 +77,66 @@ def check_same_contract(entry_symbol: str, exit_symbol: str) -> None:
             raise RollCrossed(f"{symbol!r} is not a CL outright contract")
     if entry_symbol != exit_symbol:
         raise RollCrossed(f"trade spans a roll: entry {entry_symbol}, exit {exit_symbol}")
+
+
+SECOND_COLUMNS = ["c2_close_ticks", "c2_raw_symbol", "c2_instrument_id", "c2_expiration", "c2_is_next",
+                  "c2_roll_so_far"]
+
+
+def contract_definitions(path=DEFINITIONS_FILE) -> pd.DataFrame:
+    """CL contract definitions keyed by `instrument_id` (raw_symbol repeats across decades: CLN0 = 2010 and 2020)."""
+    defs = pd.read_parquet(path, columns=["instrument_id", "raw_symbol", "expiration"])
+    for symbol in defs["raw_symbol"]:
+        assert_allowed(symbol)
+    if not defs["instrument_id"].is_unique or not defs["expiration"].is_unique or defs.isna().any().any():
+        raise DataIntegrityError("contract definitions need unique instrument_id and expiration, no nulls")
+    return defs.sort_values("expiration", ignore_index=True)
+
+
+def next_contract_ids(defs: pd.DataFrame) -> dict[int, int]:
+    """instrument_id -> id of the listed contract with the smallest expiration strictly after it."""
+    ids = defs["instrument_id"].to_numpy()  # sorted by unique expiration, so the next row is the next contract
+    return dict(zip(ids[:-1].tolist(), ids[1:].tolist()))
+
+
+def check_definitions(bars: pd.DataFrame, defs: pd.DataFrame, prefix: str = "") -> None:
+    """Every bar's (instrument_id, raw_symbol, expiration) must be its definition row."""
+    cols = [f"{prefix}instrument_id", f"{prefix}raw_symbol", f"{prefix}expiration"]
+    if bars[cols].isna().any().any():
+        raise DataIntegrityError(f"null contract fields in bars: {bars[cols].isna().sum().to_dict()}")
+    seen = bars[cols].drop_duplicates()
+    seen.columns = ["instrument_id", "raw_symbol", "expiration"]
+    m = seen.merge(defs, on="instrument_id", how="left", suffixes=("", "_def"))
+    bad = m["raw_symbol_def"].isna() | (m["raw_symbol"] != m["raw_symbol_def"]) | (m["expiration"] != m["expiration_def"])
+    if bad.any():
+        raise DataIntegrityError(f"bars disagree with contract definitions: {m[bad].head(3).to_dict('records')}")
+
+
+def attach_second(front: pd.DataFrame, second: pd.DataFrame, defs: pd.DataFrame) -> pd.DataFrame:
+    """Front bars plus the CL.v.1 bar of the same minute (`c2_*`, NaN if none) and:
+    `c2_is_next`     the second-month bar is the contract listed right after the front bar's contract;
+    `c2_roll_so_far` CL.v.1 rolled earlier in this trading day (computed on every CL.v.1 bar before the join,
+                     so a roll at a minute with no front bar still counts).
+    Both inputs need time columns (`trading_day`) and `is_roll`. Front row count and order are unchanged."""
+    for b in (front, second):
+        if not b["ts_event_utc"].is_unique:
+            raise DataIntegrityError("duplicate minutes in one continuous series")
+    check_definitions(front, defs)
+    check_definitions(second, defs)
+    sec = second.sort_values("ts_event_utc", ignore_index=True)
+    sec = sec.assign(roll_so_far=sec["is_roll"].astype(bool).groupby(sec["trading_day"]).cummax())
+    cols = {"close_ticks": "c2_close_ticks", "raw_symbol": "c2_raw_symbol", "instrument_id": "c2_instrument_id",
+            "expiration": "c2_expiration"}
+    exact = sec[["ts_event_utc", *cols]].rename(columns=cols)
+    out = front.merge(exact, on="ts_event_utc", how="left", validate="one_to_one", sort=False)
+    # latest CL.v.1 bar at or before each front minute, same trading day: its roll-so-far flag
+    left = out[["ts_event_utc", "trading_day"]].reset_index().sort_values("ts_event_utc")
+    asof = pd.merge_asof(left, sec[["ts_event_utc", "trading_day", "roll_so_far"]].rename(
+        columns={"trading_day": "sec_day"}), on="ts_event_utc", direction="backward")
+    rolled = (asof["sec_day"] == asof["trading_day"]) & asof["roll_so_far"].fillna(False).astype(bool)
+    out["c2_roll_so_far"] = pd.Series(rolled.to_numpy(), index=asof["index"].to_numpy()).sort_index().to_numpy()
+    nxt = out["instrument_id"].map(next_contract_ids(defs))
+    out["c2_is_next"] = out["c2_instrument_id"].notna() & (out["c2_instrument_id"] == nxt)
+    if len(out) != len(front) or not out["ts_event_utc"].equals(front["ts_event_utc"].reset_index(drop=True)):
+        raise DataIntegrityError("second-month join changed the front rows")
+    return out

@@ -1,0 +1,73 @@
+{
+  "k80_dev_and_D": 16,
+  "max_k": 20,
+  "underpowered": true,
+  "table": [
+    {
+      "net_edge_ticks": 0,
+      "dev_all_gates": 0.01,
+      "dev_all_and_D": 0.01,
+      "holdout_proxy": 0.06
+    },
+    {
+      "net_edge_ticks": 2,
+      "dev_all_gates": 0.0,
+      "dev_all_and_D": 0.0,
+      "holdout_proxy": 0.03
+    },
+    {
+      "net_edge_ticks": 4,
+      "dev_all_gates": 0.04,
+      "dev_all_and_D": 0.02,
+      "holdout_proxy": 0.05
+    },
+    {
+      "net_edge_ticks": 6,
+      "dev_all_gates": 0.11,
+      "dev_all_and_D": 0.08,
+      "holdout_proxy": 0.13
+    },
+    {
+      "net_edge_ticks": 8,
+      "dev_all_gates": 0.2,
+      "dev_all_and_D": 0.19,
+      "holdout_proxy": 0.06
+    },
+    {
+      "net_edge_ticks": 10,
+      "dev_all_gates": 0.38,
+      "dev_all_and_D": 0.28,
+      "holdout_proxy": 0.12
+    },
+    {
+      "net_edge_ticks": 12,
+      "dev_all_gates": 0.52,
+      "dev_all_and_D": 0.45,
+      "holdout_proxy": 0.11
+    },
+    {
+      "net_edge_ticks": 14,
+      "dev_all_gates": 0.74,
+      "dev_all_and_D": 0.68,
+      "holdout_proxy": 0.26
+    },
+    {
+      "net_edge_ticks": 16,
+      "dev_all_gates": 0.93,
+      "dev_all_and_D": 0.89,
+      "holdout_proxy": 0.35
+    },
+    {
+      "net_edge_ticks": 18,
+      "dev_all_gates": 1.0,
+      "dev_all_and_D": 0.95,
+      "holdout_proxy": 0.33
+    },
+    {
+      "net_edge_ticks": 20,
+      "dev_all_gates": 1.0,
+      "dev_all_and_D": 1.0,
+      "holdout_proxy": 0.38
+    }
+  ]
+}

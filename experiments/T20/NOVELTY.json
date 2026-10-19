@@ -1,0 +1,16 @@
+{
+  "P101": {
+    "days_both": 1765,
+    "agreement": 0.4985835694050991,
+    "ok": true
+  },
+  "P102": {
+    "days_both": 1070,
+    "agreement": 0.516822429906542,
+    "ok": true
+  },
+  "signal_days": 1841,
+  "pass": true,
+  "code_sha256": "5267839079256ebf50e0c80a87845c5563d490b8c7a51ce89a6382ac5de06e3b",
+  "bundle_sha256": "12018966dd9de8c15794145ee570829dda95d3d7ecd81e2cf6222ede098dffa2"
+}

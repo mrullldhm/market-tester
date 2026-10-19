@@ -11,9 +11,9 @@ from pathlib import Path
 import pandas as pd
 
 from . import prereg
-from .config import BARS_DIR, EIA_RELEASES_FILE
-from .data import FRONT, load_bars
-from .sessions import add_time_columns, eia_blackout, eia_release_bar
+from .config import BARS_DIR, DEFINITIONS_FILE, EIA_RELEASES_FILE
+from .data import FRONT, SECOND, attach_second, contract_definitions, load_bars
+from .sessions import add_time_columns, eia_blackout, eia_day_window, eia_release_bar
 
 
 class HoldoutLocked(PermissionError):
@@ -27,9 +27,11 @@ class Period:
     last_day: pd.Timestamp
     protected: bool
 
-    def files(self) -> list[Path]:
-        """Bar files of the period plus the EIA reference file: what a holdout prereg freezes."""
-        return [BARS_DIR / f"year={y}" / "cl.parquet" for y in self.years()] + [EIA_RELEASES_FILE]
+    def files(self, with_second: bool = False) -> list[Path]:
+        """Bar files of the period plus the EIA reference file (and the contract definitions when the strategy
+        reads the second month): what a holdout prereg freezes."""
+        extra = [DEFINITIONS_FILE] if with_second else []
+        return [BARS_DIR / f"year={y}" / "cl.parquet" for y in self.years()] + [EIA_RELEASES_FILE] + extra
 
     def years(self) -> list[int]:
         """Bar files to read: a trading day starts 18:00 ET the evening before, so the year before too."""
@@ -48,7 +50,8 @@ def select_period(bars: pd.DataFrame, period: Period) -> pd.DataFrame:
     return bars.loc[keep].reset_index(drop=True)
 
 
-def load_period(period: Period, token=None, years: list[int] | None = None, continuous: str = FRONT) -> pd.DataFrame:
+def load_period(period: Period, token=None, years: list[int] | None = None, continuous: str = FRONT,
+                with_second: bool = False, eia_window: tuple[int, int] | None = None) -> pd.DataFrame:
     """Front-month bars of a period with time columns, `eia_block` and `eia_release` (bar starting at a confirmed
     release). The holdout needs a live RunToken.
 
@@ -64,6 +67,13 @@ def load_period(period: Period, token=None, years: list[int] | None = None, cont
     if not wanted:
         raise ValueError(f"years {years} are outside {period.name}")
     bars = add_time_columns(load_bars(wanted, continuous=continuous))
+    if with_second:  # `data.attach_second`: same-minute CL.v.1 columns, joined before the period cut
+        if continuous != FRONT:
+            raise ValueError("with_second attaches CL.v.1 to the front series only")
+        bars = attach_second(bars, add_time_columns(load_bars(wanted, continuous=SECOND)), contract_definitions())
     bars = select_period(bars, period)
     ts = bars["ts_event_utc"]
-    return bars.assign(eia_block=eia_blackout(ts), eia_release=eia_release_bar(ts))
+    bars = bars.assign(eia_block=eia_blackout(ts), eia_release=eia_release_bar(ts))
+    if eia_window is not None:  # `eia_during_hold`: a listed release that day at ET minutes [lo, hi]
+        bars["eia_during_hold"] = eia_day_window(bars["trading_day"], *eia_window)
+    return bars

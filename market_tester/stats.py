@@ -16,6 +16,7 @@ import itertools
 import math
 from statistics import NormalDist
 
+import numba as nb
 import numpy as np
 import pandas as pd
 
@@ -226,3 +227,31 @@ def pbo_cscv(x, n_blocks: int = 16, max_combos: int = 20000, seed: int = 0) -> d
         w = rank / (k + 1)
         logits[c] = math.log(w / (1 - w))
     return {"pbo": float((logits <= 0).mean()), "splits": len(combos), "logit_median": float(np.median(logits))}
+
+
+@nb.njit(cache=True)
+def _boot_exceed(x, n_boot, p_new, seed):
+    np.random.seed(seed)
+    n = len(x)
+    mean = x.mean()
+    k = 0
+    for _ in range(n_boot):
+        j = np.random.randint(n)
+        total = x[j]
+        for _i in range(1, n):
+            j = np.random.randint(n) if np.random.random() < p_new else (j + 1) % n
+            total += x[j]
+        if total / n - mean >= mean:  # centred bootstrap mean at least as large as the observed one
+            k += 1
+    return k
+
+
+def bootstrap_p(day_pnl, n_boot: int = 49_999, mean_block: float = 5.0, seed: int = 0) -> float:
+    """One-sided p for mean day P&L > 0: stationary block bootstrap (mean block `mean_block` days, wrapping),
+    p = (k + 1) / (B + 1), k = centred bootstrap means >= the observed mean. Same test as `romano_wolf` with one
+    column, compiled so 49,999 draws are cheap (power simulation, subset gates)."""
+    x = np.asarray(day_pnl, float)
+    if len(x) < 2 or not np.isfinite(x).all() or mean_block < 1:
+        raise ValueError("need >= 2 finite days and mean_block >= 1")
+    k = _boot_exceed(x, int(n_boot), 1.0 / mean_block, int(seed))
+    return float((k + 1) / (n_boot + 1))

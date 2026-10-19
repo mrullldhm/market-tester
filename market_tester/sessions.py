@@ -51,3 +51,15 @@ def eia_release_bar(ts_utc: pd.Series, releases=None) -> np.ndarray:
     releases = eia_release_times(confirmed_only=True) if releases is None else releases
     t = ts_utc.to_numpy(dtype="datetime64[ns]").astype(np.int64)
     return np.isin(t, np.asarray(releases.as_unit("ns").asi8, dtype=np.int64))
+
+
+def eia_day_window(trading_day: pd.Series, lo_minute: int, hi_minute: int, releases=None) -> np.ndarray:
+    """Per bar: True if any listed release (candidate or confirmed) of the bar's trading day has an ET time in
+    [lo_minute, hi_minute] minutes after ET midnight. From the advance schedule only, so it is the same for every
+    bar of a day (truncation-invariant)."""
+    releases = eia_release_times() if releases is None else releases
+    et = pd.DatetimeIndex(releases).tz_convert(ET)
+    minute = et.hour * 60 + et.minute
+    keep = (minute >= lo_minute) & (minute <= hi_minute)
+    hit = set(et[keep].tz_localize(None).normalize())
+    return pd.Series(trading_day).isin(hit).to_numpy()

@@ -6,7 +6,8 @@ Backtesting research to find a **profitable strategy on CL** (NYMEX Light Crude 
 - **CL only.** MCL (Micro WTI) is banned: non-syariah for the owner. `market_tester.config.assert_allowed`
   rejects every symbol that is not CL, and the bar loader calls it on every symbol it reads.
 - **Order of work:** 1) find a strategy that is profitable after costs on data it was not tuned on;
-  2) only then build a trading bot. Prop-firm rules are not part of the goal for now.
+  2) only then build a trading bot. **Intraday only** (end use is a prop firm): every trade is flat the same
+  session. Prop-firm rule details come after a strategy passes.
 - **Team:** Claude builds (code, tests, reports); Codex reviews adversarially and replicates headline
   numbers with its own code (see `AGENTS.md`). No result counts until Codex has checked it.
 

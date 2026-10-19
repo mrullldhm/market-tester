@@ -70,6 +70,9 @@ Dev period 2010-06 .. 2021-12 unless stated. Costs as section 2.
 | P108 | Turtle Soup intraday (prior-day extreme) | 1 | -$20.02/trade | entries beat random (Holm p 0.025) but edge < cost |
 | P109 | Donchian 20/10 5m + 2N stop | 1 | -$13.35/trade | gross edge < cost |
 | P110 | MACD(12,26,9) 5m cross | 1 | -$14.26/trade | gross edge < cost |
+| T101 | Term structure (front-second spread) as intraday direction, 09:00-14:29 | 0 (dropped at spec) | not run | carry is paid to a spread position, not the outright; no cost basis |
+| T102 | Spread lead: front 08:59-09:59 residual on second month, \|r\|>=σ, hold to 14:29 | 0 (not run) | power: 80% only at 16 net ticks | underpowered (847 trades, ~150-tick noise) |
+| T201 | Spread lead, every eligible non-EIA day, hold 10:00-10:59 | 0 (not run) | power gate FAIL: D alone 70% at 4 net ticks | underpowered; family `spread_lead` closed (experiments/T10, T20) |
 
 P101-P110: dev 2010-06..2023-12 only, one frozen config each, replicated by Codex (`experiments/P10/`).
 
@@ -96,6 +99,9 @@ Deleting code does not un-see data. Honest status:
 | 2022-01 .. 2026-10 | touched by EMA x VWAP holdout, ACD signal test and VWAP Break full run (P&L by year). **Quasi-clean**: fine for a new, unrelated idea, not for EMA/ACD/VWAP-break variants |
 | after 2026-10-13 | never seen. Only truly clean data = future data (forward / paper trading) |
 
+T10/T20 (2026-10-19) touched dev only: second-month signal inputs and unsigned 10:00-14:29 / 10:00-10:59 move
+sizes. No signed strategy P&L, no holdout.
+
 **Rule for market-tester:** holdout fixed 2026-10-18 before any test: dev = trading days 2010-06-07 .. 2023-12-31,
 holdout = 2024-01-01 .. 2026-10-13 (`periods.py`, ledger D001). Every look is a ledger row; one run per prereg.
 
@@ -112,3 +118,18 @@ holdout = 2024-01-01 .. 2026-10-13 (`periods.py`, ledger D001). Every look is a 
 7. **Codex blind replication** caught real bugs: replicate headline numbers with independent code.
 8. A tuned 2.5-month backtest says nothing (VWAP Break claimed +$40,878, lost every year over 16 years).
 9. Micro contracts (MCL) were already out of scope and are now **banned** (non-syariah for owner).
+10. **Stop intraday indicator searches** (decided 2026-10-19, Claude + Codex). 18 strategies: gross edges
+    $3-11/trade vs $24.02 cost; real-but-small entry edges (P102, P108) cannot pay it. Codex odds for another
+    1-60 min OHLCV indicator passing: low single-digit %. Owner needs **intraday only** (prop-firm target), so
+    next tests must stay intraday but be low-turnover: few trades, long holds within the session (expected move
+    far above $24), signals from slower information (e.g. CL.v.0/CL.v.1 term structure, prior days) rather than
+    minute-bar indicators. Order flow / POC is weakly testable (2015-16 mbp-1 slice only); "watch the tape" is not testable.
+11. **Power wall (2026-10-19, Claude + Codex, T10/T20).** On dev 2010-2023 a 1-hour CL hold has ~53-tick noise
+    per trade; with ~1,800 trades and α 0.002 the smallest certifiable edge is ~4.6 net ticks nominal, 5-6 in
+    practice ($50-60 net, $74-84 gross per trade); the 2.8-year holdout needs ~8-10, one year of new data ~12.
+    Every edge seen so far was 0.3-1.1 gross ticks. Run a blind power check (signal inputs + unsigned moves only)
+    before any P&L; it saved two trials here.
+12. **Global DSR as built is mis-specified** (T20 R-T20-5): the tested strategy's own Sharpe sat in its own variance
+    pool, and P101-P110 (cost-driven negative Sharpes) are not a null distribution. Next time: one primary global
+    correction (Bonferroni p), DSR descriptive only, or a null pool simulated with matched frequency and hold.
+

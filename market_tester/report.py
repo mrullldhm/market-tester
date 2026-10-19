@@ -104,9 +104,16 @@ def _write(item_id: str, tag: str, md: str, numbers: dict) -> Path:
 def evaluate(strategy, grid: dict, *, item_id: str, hypothesis: str, bars: pd.DataFrame | None = None,
              years: list[int] | None = None, gates: dict | None = None, slip_ticks: float = 1, n_jobs: int = 1,
              n_boot: int = 2000, n_random: int = 200, n_mc: int = 5000, capital: float | None = None,
-             seed: int = 0, write: bool = True, kind: str = "dev", family: str | None = None) -> dict:
+             seed: int = 0, write: bool = True, kind: str = "dev", family: str | None = None,
+             global_dsr: dict | None = None) -> dict:
     """Dev-period evaluation of a parameter grid. `family` = the research idea this item belongs to
     (default: item_id); renamed variants of one idea must share it so their trials add up.
+
+    `global_dsr` = {"n_trials", "sharpes", "source"}: deflate against research ideas beyond this family. Trials =
+    max(family count, n_trials); Sharpe variance over `sharpes` (per-day Sharpes of earlier one-config items) plus
+    this pick's own. A strategy with `requires_second = True` gets the CL.v.1 columns (`data.attach_second`); one
+    with `eligible(bars, **params)` has random entries drawn only among its eligible days.
+    With one config, the profitability p (Romano-Wolf = block bootstrap) uses all `n_boot` draws.
 
     kind="dev"          the whole dev period; only its PASS makes a candidate
     kind="exploratory"  real dev data, `years` may narrow it; trials count, verdict is EXPLORATORY-*
@@ -135,7 +142,7 @@ def evaluate(strategy, grid: dict, *, item_id: str, hypothesis: str, bars: pd.Da
                                  n_configs=n_configs, code_sha256=ledger.code_sha256(),
                                  note=f"{strategy_id(strategy)} {grid} years={years or 'all'}")
         print(f"[{item_id}] logged {start_id}; loading dev bars {years or 'all years'}", flush=True)
-        bars = load_period(DEV, years=years)
+        bars = load_period(DEV, years=years, with_second=needs_second(strategy), eia_window=eia_window(strategy))
     else:
         prior, start_id = 0, f"{item_id}-synthetic"
     market = Market.from_bars(bars)
@@ -162,8 +169,14 @@ def evaluate(strategy, grid: dict, *, item_id: str, hypothesis: str, bars: pd.Da
     n_trials = max(ledger.configs_tried(family) if real else n_configs, len(all_sharpes))
     # spread of Sharpe across every counted trial (Bailey & Lopez de Prado); 1/T when only one is known
     sharpe_var = float(np.var(all_sharpes, ddof=1)) if len(all_sharpes) > 1 else 1.0 / len(days)
+    if global_dsr is not None:
+        x = d["pnl"].to_numpy()
+        own = float(x.mean() / x.std()) if x.std() > 0 else 0.0  # same per-day Sharpe as deflated_sharpe's `sr`
+        pool = np.r_[np.asarray(global_dsr["sharpes"], float), own]
+        n_trials = max(n_trials, int(global_dsr["n_trials"]))
+        sharpe_var = float(np.var(pool, ddof=1))
     dsr = deflated_sharpe(d["pnl"].to_numpy(), n_trials, sharpe_var)
-    rw = romano_wolf(res.pnl, n_boot=min(n_boot, 1000), seed=seed)
+    rw = romano_wolf(res.pnl, n_boot=min(n_boot, 1000) if n_configs > 1 else n_boot, seed=seed)
     spa = spa_test(res.pnl, n_boot=min(n_boot, 1000), seed=seed) if n_configs > 1 else {"p": float("nan")}
     pbo = pbo_cscv(res.pnl) if n_configs > 1 else {"pbo": float("nan"), "splits": 0}
     wf = walk_forward(res)
@@ -175,7 +188,8 @@ def evaluate(strategy, grid: dict, *, item_id: str, hypothesis: str, bars: pd.Da
     lo, hi = gates["recent_years"]
     recent = trades[pd.DatetimeIndex(trades["trading_day"]).year.isin(range(lo, hi + 1))]
     print(f"[{item_id}] random-entry baseline ({n_random} draws)", flush=True)
-    rnd = random_entry_test(market, trades, sig, slip_ticks, n_random, seed, progress=True)
+    rnd = random_entry_test(market, trades, sig, slip_ticks, n_random, seed, progress=True,
+                            eligible=eligible_mask(strategy, bars, params))
     print(f"[{item_id}] look-ahead check", flush=True)
     trunc = lookahead_check(strategy, bars, params, seed=seed, full=sig)
 
@@ -204,7 +218,7 @@ def evaluate(strategy, grid: dict, *, item_id: str, hypothesis: str, bars: pd.Da
     numbers = {"item_id": item_id, "family": family, "hypothesis": hypothesis, "strategy": strategy_id(strategy),
                "kind": kind, "start_run_id": start_id, "configs_all_families": ledger.configs_tried(),
                "period": f"{days[0].date()}..{days[-1].date()}", "grid": grid, "n_configs": n_configs,
-               "n_trials": n_trials, "pick": params, "slip_ticks": slip_ticks, "summary": s, "dsr": dsr,
+               "n_trials": n_trials, "sharpe_var": sharpe_var, "global_dsr": global_dsr, "pick": params, "slip_ticks": slip_ticks, "summary": s, "dsr": dsr,
                "romano_wolf_p_pick": rw_p, "spa_p": spa["p"], "pbo": pbo, "clustered": cl, "bootstrap": boot,
                "monte_carlo": mc, "random_entry": rnd, "lookahead": trunc,
                "walk_forward": {k: v for k, v in wf.items() if k not in ("day_pnl", "day_trades", "years")},
@@ -232,15 +246,29 @@ def evaluate(strategy, grid: dict, *, item_id: str, hypothesis: str, bars: pd.Da
         ledger.append(item_id, result_kind, "synthetic" if kind == "synthetic" else "dev", family=family,
                       n_configs=n_configs,
                       statistic="net_usd_per_trade", value=s["net_usd_per_trade"], p_value=rw_p, verdict=verdict,
-                      code_sha256=numbers["code_sha256"], output=str(out), note=strategy_id(strategy))
+                      code_sha256=numbers["code_sha256"], output=str(out),
+                      note=strategy_id(strategy) + (f" global_dsr={global_dsr['source']}" if global_dsr else ""))
     print(f"[{item_id}] {verdict} in {numbers['seconds']}s", flush=True)
     numbers.update(trades=trades, grid_result=res, gate_table=gate_df, markdown=md)
     return numbers
 
 
+def needs_second(strategy) -> bool:
+    return bool(getattr(type(strategy), "requires_second", False))
+
+
+def eia_window(strategy) -> tuple[int, int] | None:
+    """A strategy's `eia_window` class attribute (ET minutes): the loader adds `eia_during_hold`."""
+    return getattr(type(strategy), "eia_window", None)
+
+
+def eligible_mask(strategy, bars: pd.DataFrame, params: dict):
+    return strategy.eligible(bars, **params) if hasattr(strategy, "eligible") else None
+
+
 def register_holdout(spec: dict, strategy) -> Path:
     """Freeze a holdout test (owner approval + Codex review named in the spec)."""
-    return prereg.register(spec, strategy, HOLDOUT.files())
+    return prereg.register(spec, strategy, HOLDOUT.files(with_second=needs_second(strategy)))
 
 
 def evaluate_holdout(strategy, prereg_path: Path, n_boot: int = 2000, n_random: int = 200, n_mc: int = 5000,
@@ -250,7 +278,7 @@ def evaluate_holdout(strategy, prereg_path: Path, n_boot: int = 2000, n_random: 
     gates = prereg.holdout_gates(spec["gates"])
     params, slip, seed = spec["params"], spec["slip_ticks"], spec["seed"]
     with prereg.open_run(prereg_path, strategy) as token:
-        bars = load_period(HOLDOUT, token)
+        bars = load_period(HOLDOUT, token, with_second=needs_second(strategy), eia_window=eia_window(strategy))
     market = Market.from_bars(bars)
     days = trading_days(bars)
     sig = strategy.signals(bars, **params)
@@ -259,7 +287,8 @@ def evaluate_holdout(strategy, prereg_path: Path, n_boot: int = 2000, n_random: 
     s = summary(trades, days)
     cl = clustered_mean(trades["net_usd"], trades["trading_day"])
     boot = bootstrap_ci(d["pnl"], d["n"], n_boot=n_boot, seed=seed)
-    rnd = random_entry_test(market, trades, sig, slip, n_random, seed, progress=True)
+    rnd = random_entry_test(market, trades, sig, slip, n_random, seed, progress=True,
+                            eligible=eligible_mask(strategy, bars, params))
     mc = (monte_carlo(trades["net_usd"].to_numpy(), d["pnl"].to_numpy(), n_sims=n_mc, seed=seed, capital=capital)
           if len(trades) else {})
     stressed = with_costs(trades, gates["stress_slip_ticks"])

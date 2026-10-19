@@ -3,7 +3,8 @@
 - **CL only. MCL is banned** (non-syariah for the owner). Never propose, download or test MCL or any other
   market. Keep `assert_allowed` on every data path.
 - **Goal order:** profitable CL strategy first (after costs, on data not used to build it); trading bot last.
-  Prop-firm rules are not a goal for now.
+- **Intraday only:** the bot's end use is a prop firm, so every trade is flat the same session. No multi-day
+  holds. Prop-firm rule details (drawdown, payout) come later, after a strategy passes.
 - **Read `LESSONS.md`** before proposing a strategy. Do not re-test a dead idea without a new angle; respect
   the "data already seen" table.
 - **Codex gate:** Claude builds; Codex reviews and independently replicates (`AGENTS.md`) before any result is
