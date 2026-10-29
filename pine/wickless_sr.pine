@@ -1,0 +1,463 @@
+// Wickless S/R Retest. Rules: pine/SPEC.md (keep in sync with pine/crosscheck.py).
+// Chart tool, not a validated strategy: the dashboard is in-sample on the loaded history.
+//@version=6
+indicator("Wickless S/R Retest", shorttitle = "WSR", overlay = true, max_lines_count = 500,
+     max_labels_count = 500, max_boxes_count = 500, max_bars_back = 500)
+
+// ---------- inputs ----------
+G_DET = "Detection"
+tolTicks      = input.int(0, "Wick tolerance (ticks)", minval = 0, group = G_DET)
+minRangeTicks = input.int(1, "Min bar range (ticks)", minval = 0, group = G_DET)
+directional   = input.bool(true, "Directional (body colour must match)", group = G_DET,
+     tooltip = "On: no-bottom-wick needs a green candle (support), no-top-wick a red candle (resistance).")
+showVol       = input.bool(true, "Show volume label", group = G_DET)
+
+G_LVL = "Levels"
+minGap        = input.int(1, "Bars before retest allowed", minval = 1, group = G_LVL)
+maxAge        = input.int(100, "Level max age (bars)", minval = 1, group = G_LVL)
+maxLevels     = input.int(20, "Max live levels per side", minval = 1, maxval = 100, group = G_LVL)
+resetSession  = input.bool(true, "Delete levels at session end / new day", group = G_LVL)
+
+G_TRD = "Trade"
+pivLeft       = input.int(5, "Swing left bars", minval = 1, maxval = 100, group = G_TRD)
+pivRight      = input.int(2, "Swing right bars", minval = 1, maxval = 50, group = G_TRD)
+stopBufTicks  = input.int(0, "Stop buffer (ticks)", minval = 0, group = G_TRD)
+maxRiskTicks  = input.int(0, "Max risk (ticks, 0 = off)", minval = 0, group = G_TRD)
+rr            = input.float(1.1, "Reward : risk", minval = 0.1, step = 0.1, group = G_TRD)
+flatSession   = input.bool(true, "Flat at session end", group = G_TRD)
+qty           = input.int(1, "Contracts", minval = 1, group = G_TRD)
+costRT        = input.float(24.02, "Cost per contract round trip ($)", minval = 0, group = G_TRD)
+showBoxes     = input.bool(true, "Draw trade boxes", group = G_TRD)
+
+G_RIB = "Filter: MA ribbon"
+useRibbon     = input.bool(false, "Use ribbon filter", group = G_RIB)
+ribbonType    = input.string("EMA", "Type", options = ["EMA", "SMA"], group = G_RIB)
+ribbonMode    = input.string("Stacked", "Mode", options = ["Stacked", "Price vs slowest"], group = G_RIB)
+len1          = input.int(8, "Length 1 (fastest)", minval = 1, group = G_RIB)
+len2          = input.int(13, "Length 2", minval = 1, group = G_RIB)
+len3          = input.int(21, "Length 3", minval = 1, group = G_RIB)
+len4          = input.int(34, "Length 4", minval = 1, group = G_RIB)
+len5          = input.int(55, "Length 5 (slowest)", minval = 1, group = G_RIB)
+showRibbon    = input.bool(true, "Plot ribbon", group = G_RIB)
+
+G_ST = "Filter: Supertrend"
+useST         = input.bool(false, "Use Supertrend filter", group = G_ST)
+stFactor      = input.float(3.0, "Factor", minval = 0.1, step = 0.1, group = G_ST)
+stAtrLen      = input.int(10, "ATR length", minval = 1, group = G_ST)
+showST        = input.bool(true, "Plot Supertrend", group = G_ST)
+
+G_OTH = "Other"
+filterArrows  = input.bool(false, "Hide detections that fail the filters", group = G_OTH)
+dashPos       = input.string("Top right", "Dashboard position",
+     options = ["Top right", "Top left", "Bottom right", "Bottom left"], group = G_OTH)
+
+
+// ---------- guards ----------
+if syminfo.root != "CL"
+    runtime.error("Wickless S/R: CL only (root " + syminfo.root + " refused). See CLAUDE.md.")
+if maxAge < minGap
+    runtime.error("Level max age must be >= bars before retest.")
+
+// ---------- helpers ----------
+mt = syminfo.mintick
+toT(float p) => int(math.round(p / mt))
+
+// EMA seeded with the SMA of the first `len` values (SPEC section 5).
+emaSeeded(float src, int len) =>
+    var float e = na
+    s = ta.sma(src, len)
+    if na(e)
+        e := s
+    else
+        e := (2.0 / (len + 1)) * src + (1 - 2.0 / (len + 1)) * e
+    e
+
+// RMA seeded with the SMA of the first `len` values.
+rmaSeeded(float src, int len) =>
+    var float r = na
+    s = ta.sma(src, len)
+    if na(r)
+        r := s
+    else
+        r := (r * (len - 1) + src) / len
+    r
+
+ribbonMa(float src, int len) =>
+    e = emaSeeded(src, len)
+    s = ta.sma(src, len)
+    ribbonType == "EMA" ? e : s
+
+// ---------- filters (values at this bar; entries read them at [1]) ----------
+m1 = ribbonMa(close, len1)
+m2 = ribbonMa(close, len2)
+m3 = ribbonMa(close, len3)
+m4 = ribbonMa(close, len4)
+m5 = ribbonMa(close, len5)
+anyNa = na(m1) or na(m2) or na(m3) or na(m4) or na(m5)
+ribLong  = not anyNa and (ribbonMode == "Stacked" ? m1 > m2 and m2 > m3 and m3 > m4 and m4 > m5 : close > m5)
+ribShort = not anyNa and (ribbonMode == "Stacked" ? m1 < m2 and m2 < m3 and m3 < m4 and m4 < m5 : close < m5)
+
+trueRange = bar_index == 0 ? high - low : math.max(high - low, math.abs(high - close[1]), math.abs(low - close[1]))
+stAtr = rmaSeeded(trueRange, stAtrLen)
+var float stUp = na
+var float stDn = na
+var int stTrend = 0 // 1 bull, -1 bear, 0 = not ready
+if not na(stAtr)
+    hl2v = (high + low) / 2
+    upB = hl2v - stFactor * stAtr
+    dnB = hl2v + stFactor * stAtr
+    if na(stUp)
+        stUp := upB
+        stDn := dnB
+        stTrend := 1
+    else
+        prevUp = stUp
+        prevDn = stDn
+        stUp := upB > prevUp or close[1] < prevUp ? upB : prevUp
+        stDn := dnB < prevDn or close[1] > prevDn ? dnB : prevDn
+        stTrend := stTrend == 1 ? (close < stUp ? -1 : 1) : (close > stDn ? 1 : -1)
+
+longOK  = (not useRibbon or ribLong) and (not useST or stTrend == 1)
+shortOK = (not useRibbon or ribShort) and (not useST or stTrend == -1)
+
+// ---------- detection (ticks) ----------
+oT = toT(open)
+hT = toT(high)
+lT = toT(low)
+cT = toT(close)
+noBot = math.min(oT, cT) - lT <= tolTicks
+noTop = hT - math.max(oT, cT) <= tolTicks
+validBar = hT - lT >= minRangeTicks
+isBull = cT > oT
+isBear = cT < oT
+// both wicks absent: body-colour side only, doji = neither
+bothNo = noBot and noTop
+rawSup = validBar and noBot and (directional or bothNo ? isBull : true)
+rawRes = validBar and noTop and (directional or bothNo ? isBear : true)
+detSup = barstate.isconfirmed and rawSup and (not filterArrows or longOK)
+detRes = barstate.isconfirmed and rawRes and (not filterArrows or shortOK)
+
+// ---------- session clock (SPEC section 0) ----------
+tfMin = timeframe.in_seconds() / 60
+etMin = hour(time, "America/New_York") * 60 + minute(time, "America/New_York")
+isSessionEnd = timeframe.isintraday and etMin <= 16 * 60 + 59 and 16 * 60 + 59 < etMin + tfMin
+isNewDay = bar_index > 0 and time_tradingday != time_tradingday[1]
+tfSupported = timeframe.isminutes and array.from(1, 2, 3, 5, 10, 15, 20, 30, 60).includes(timeframe.multiplier)
+if not tfSupported
+    runtime.error("Wickless S/R: use a 1, 2, 3, 5, 10, 15, 20, 30 or 60 minute chart (SPEC section 0).")
+// TradingView does not expose roll dates on continuous symbols; see SPEC section 7.
+isContinuous = str.endswith(syminfo.ticker, "!")
+
+// ---------- state ----------
+type Trade
+    int side
+    int entryT
+    int stopT
+    int tgtT
+    int riskT
+    int entryBar
+    box zTgt
+    box zStop
+
+type Stats
+    int n = 0
+    int wins = 0
+    int targets = 0
+    float sumR = 0.0
+    float grossP = 0.0
+    float grossL = 0.0
+    float cumNet = 0.0
+    float peakNet = 0.0
+    float ddNet = 0.0
+    float cumR = 0.0
+    float peakR = 0.0
+    float ddR = 0.0
+    int nLong = 0
+    int nShort = 0
+    float netLong = 0.0
+    float netShort = 0.0
+
+var levelPrice = array.new_int()  // ticks
+var levelSide  = array.new_int()  // 1 support, -1 resistance
+var levelBar   = array.new_int()
+var levelLine  = array.new_line()
+var pivLowT    = array.new_int()
+var pivHighT   = array.new_int()
+var Trade tr   = na
+var Stats st   = Stats.new()
+
+bool evEntry = false
+int entrySide = 0
+bool evStop = false
+bool evTarget = false
+
+removeLevel(int i, color c) =>
+    ln = levelLine.get(i)
+    ln.set_x2(bar_index)
+    ln.set_extend(extend.none)
+    ln.set_color(c)
+    levelPrice.remove(i)
+    levelSide.remove(i)
+    levelBar.remove(i)
+    levelLine.remove(i)
+
+clearLevels() =>
+    if levelPrice.size() > 0
+        for i = levelPrice.size() - 1 to 0
+            removeLevel(i, color.gray)
+
+// Books a closed trade into the stats (SPEC section 6).
+closeTrade(Stats s, Trade t, int exitT, string reason) =>
+    pnlT = (exitT - t.entryT) * t.side
+    r = float(pnlT) / t.riskT
+    net = pnlT * mt * syminfo.pointvalue * qty - costRT * qty
+    s.n += 1
+    if net > 0
+        s.wins += 1
+        s.grossP += net
+    else
+        s.grossL -= net
+    if reason == "target"
+        s.targets += 1
+    s.sumR += r
+    s.cumNet += net
+    s.peakNet := math.max(s.peakNet, s.cumNet)
+    s.ddNet := math.max(s.ddNet, s.peakNet - s.cumNet)
+    s.cumR += r
+    s.peakR := math.max(s.peakR, s.cumR)
+    s.ddR := math.max(s.ddR, s.peakR - s.cumR)
+    if t.side == 1
+        s.nLong += 1
+        s.netLong += net
+    else
+        s.nShort += 1
+        s.netShort += net
+    if not na(t.zTgt)
+        t.zTgt.set_right(bar_index)
+        t.zStop.set_right(bar_index)
+    txt = reason == "target" ? "TP" : reason == "stop" ? "SL" : reason == "session" ? "EOS" : "GAP"
+    label.new(bar_index, close, txt, yloc = t.side == 1 ? yloc.abovebar : yloc.belowbar, style = label.style_none,
+         size = size.small, textcolor = net > 0 ? color.teal : color.red)
+
+// ---------- per-bar engine (closed bars only, SPEC section 4 step order) ----------
+if barstate.isconfirmed
+    exitedNow = false
+
+    // 0. new trading day: a trade the 16:59 bar did not close exits at the open
+    if isNewDay
+        if not na(tr)
+            closeTrade(st, tr, oT, "gap")
+            tr := na
+            exitedNow := true
+        if resetSession
+            clearLevels()
+
+    // (a) manage open trade (entered on an earlier bar)
+    if not na(tr)
+        stopHit = tr.side == 1 ? lT <= tr.stopT : hT >= tr.stopT
+        tgtHit = tr.side == 1 ? hT >= tr.tgtT + 1 : lT <= tr.tgtT - 1
+        if stopHit
+            closeTrade(st, tr, tr.side == 1 ? math.min(oT, tr.stopT) : math.max(oT, tr.stopT), "stop")
+            evStop := true
+            tr := na
+            exitedNow := true
+        else if tgtHit
+            closeTrade(st, tr, tr.tgtT, "target")
+            evTarget := true
+            tr := na
+            exitedNow := true
+        else if not na(tr.zTgt)
+            tr.zTgt.set_right(bar_index)
+            tr.zStop.set_right(bar_index)
+
+    // (b) expire
+    if levelPrice.size() > 0
+        for i = levelPrice.size() - 1 to 0
+            if bar_index > levelBar.get(i) + maxAge
+                removeLevel(i, color.gray)
+
+    // (c) touches: pick candidate, then consume every touched level
+    int bestI = -1
+    bool sawSup = false
+    bool sawRes = false
+    if levelPrice.size() > 0
+        for i = 0 to levelPrice.size() - 1
+            if bar_index >= levelBar.get(i) + minGap
+                p = levelPrice.get(i)
+                sd = levelSide.get(i)
+                if sd == 1 ? lT <= p : hT >= p
+                    sawSup := sawSup or sd == 1
+                    sawRes := sawRes or sd == -1
+                    if bestI < 0
+                        bestI := i
+                    else
+                        bd = levelBar.get(bestI)
+                        d = levelBar.get(i)
+                        if d > bd or (d == bd and math.abs(p - oT) < math.abs(levelPrice.get(bestI) - oT))
+                            bestI := i
+    int side = 0
+    int fillT = na
+    if bestI >= 0 and not (sawSup and sawRes)
+        side := levelSide.get(bestI)
+        p = levelPrice.get(bestI)
+        if side == 1
+            fillT := oT <= p ? oT : lT <= p - 1 ? p : na
+        else
+            fillT := oT >= p ? oT : hT >= p + 1 ? p : na
+    if levelPrice.size() > 0
+        for i = levelPrice.size() - 1 to 0
+            if bar_index >= levelBar.get(i) + minGap
+                p = levelPrice.get(i)
+                sd = levelSide.get(i)
+                if sd == 1 ? lT <= p : hT >= p
+                    removeLevel(i, sd == 1 ? color.new(color.teal, 60) : color.new(color.red, 60))
+
+    if side != 0 and not na(fillT) and na(tr) and not exitedNow and not isSessionEnd
+        int stopT = na
+        if side == 1 ? longOK[1] : shortOK[1]
+            pivs = side == 1 ? pivLowT : pivHighT
+            if pivs.size() > 0
+                for i = pivs.size() - 1 to 0
+                    pv = pivs.get(i)
+                    if side == 1 ? pv < fillT : pv > fillT
+                        stopT := pv - side * stopBufTicks
+                        break
+        if not na(stopT)
+            riskT = math.abs(fillT - stopT)
+            if riskT >= 1 and (maxRiskTicks == 0 or riskT <= maxRiskTicks)
+                tgtT = fillT + side * int(math.ceil(rr * riskT - 1e-9))
+                box zT = na
+                box zS = na
+                if showBoxes
+                    zT := box.new(bar_index, tgtT * mt, bar_index, fillT * mt, border_color = color.new(color.teal, 70),
+                         bgcolor = color.new(color.teal, 85))
+                    zS := box.new(bar_index, fillT * mt, bar_index, stopT * mt, border_color = color.new(color.red, 70),
+                         bgcolor = color.new(color.red, 85))
+                tr := Trade.new(side, fillT, stopT, tgtT, riskT, bar_index, zT, zS)
+                evEntry := true
+                entrySide := side
+                // entry bar: stop only, exit at the stop
+                if side == 1 ? lT <= stopT : hT >= stopT
+                    closeTrade(st, tr, stopT, "stop")
+                    evStop := true
+                    tr := na
+
+    // (d) detection on this bar
+    if detSup or detRes
+        s = detSup ? 1 : -1
+        pT = s == 1 ? lT : hT
+        cnt = 0
+        oldest = -1
+        if levelPrice.size() > 0
+            for i = 0 to levelPrice.size() - 1
+                if levelSide.get(i) == s
+                    cnt += 1
+                    if oldest < 0
+                        oldest := i
+        if cnt >= maxLevels
+            removeLevel(oldest, color.gray)
+        ln = line.new(bar_index, pT * mt, bar_index + 1, pT * mt, extend = extend.right,
+             color = s == 1 ? color.teal : color.red, width = 2)
+        levelPrice.push(pT)
+        levelSide.push(s)
+        levelBar.push(bar_index)
+        levelLine.push(ln)
+
+    // (e) session end
+    if isSessionEnd
+        if flatSession and not na(tr)
+            closeTrade(st, tr, cT, "session")
+            tr := na
+        if resetSession
+            clearLevels()
+
+    // pivots found at this bar (usable from the next bar)
+    if bar_index >= pivLeft + pivRight
+        cl = toT(low[pivRight])
+        ch = toT(high[pivRight])
+        isPL = true
+        isPH = true
+        for k = 0 to pivRight - 1
+            if toT(low[k]) <= cl
+                isPL := false
+            if toT(high[k]) >= ch
+                isPH := false
+        for k = pivRight + 1 to pivRight + pivLeft
+            if toT(low[k]) < cl
+                isPL := false
+            if toT(high[k]) > ch
+                isPH := false
+        if isPL
+            pivLowT.push(cl)
+            if pivLowT.size() > 50
+                pivLowT.shift()
+        if isPH
+            pivHighT.push(ch)
+            if pivHighT.size() > 50
+                pivHighT.shift()
+
+// ---------- marks ----------
+plotshape(detSup, "No bottom wick", shape.triangleup, location.belowbar, color.teal, size = size.normal)
+plotshape(detRes, "No top wick", shape.triangledown, location.abovebar, color.red, size = size.normal)
+atr14 = ta.atr(14)
+if showVol and (detSup or detRes)
+    label.new(bar_index, detSup ? low - atr14 * 1.3 : high + atr14 * 1.3, str.tostring(volume, format.volume),
+         style = label.style_none, size = size.small, textcolor = detSup ? color.teal : color.red)
+
+p1 = plot(showRibbon ? m1 : na, "MA 1", color.aqua)
+plot(showRibbon ? m2 : na, "MA 2", color.new(color.aqua, 30))
+plot(showRibbon ? m3 : na, "MA 3", color.new(color.blue, 30))
+plot(showRibbon ? m4 : na, "MA 4", color.new(color.purple, 30))
+p5 = plot(showRibbon ? m5 : na, "MA 5", color.purple)
+fill(p1, p5, color = ribLong ? color.new(color.teal, 85) : ribShort ? color.new(color.red, 85) : color.new(color.gray, 90))
+plot(showST and stTrend == 1 ? stUp : na, "ST up", color.teal, 2, plot.style_linebr)
+plot(showST and stTrend == -1 ? stDn : na, "ST down", color.red, 2, plot.style_linebr)
+
+// hidden series for "Export chart data" (pine/crosscheck.py compares these)
+plot(detSup ? 1 : detRes ? -1 : 0, "x_det", display = display.data_window)
+plot(entrySide, "x_entry", display = display.data_window)
+plot(st.n, "x_n", display = display.data_window)
+plot(st.cumNet, "x_net", display = display.data_window)
+plot(st.cumR, "x_r", display = display.data_window)
+
+alertcondition(detSup, "No bottom wick", "WSR: support detected")
+alertcondition(detRes, "No top wick", "WSR: resistance detected")
+alertcondition(evEntry, "Retest entry", "WSR: retest entry")
+alertcondition(evStop, "Stop hit", "WSR: stop hit")
+alertcondition(evTarget, "Target hit", "WSR: target hit")
+
+// ---------- dashboard ----------
+pos = switch dashPos
+    "Top left" => position.top_left
+    "Bottom right" => position.bottom_right
+    "Bottom left" => position.bottom_left
+    => position.top_right
+var table dash = table.new(pos, 2, 15, bgcolor = color.new(color.black, 20), border_width = 1,
+     border_color = color.new(color.gray, 60))
+
+row(int r, string k, string v, color c = color.white) =>
+    dash.cell(0, r, k, text_color = color.silver, text_size = size.small, text_halign = text.align_left)
+    dash.cell(1, r, v, text_color = c, text_size = size.small, text_halign = text.align_right)
+
+fmt(float x, string f) => na(x) ? "-" : str.tostring(x, f)
+
+if barstate.islast
+    n = st.n
+    wr = n > 0 ? 100.0 * st.wins / n : na
+    th = n > 0 ? 100.0 * st.targets / n : na
+    pf = n > 0 and st.grossL > 0 ? st.grossP / st.grossL : na
+    row(0, "Wickless S/R", isContinuous ? "in-sample, rolls not voided" : "in-sample", color.orange)
+    row(1, "Trades", str.tostring(n))
+    row(2, "Win rate (net $ > 0)", fmt(wr, "#.0") + (na(wr) ? "" : "%"))
+    row(3, "Target-hit rate", fmt(th, "#.0") + (na(th) ? "" : "%"))
+    row(4, "Break-even win rate", str.tostring(100.0 / (1 + rr), "#.0") + "% (pre-cost)")
+    row(5, "Avg R", fmt(n > 0 ? st.sumR / n : na, "#.00"))
+    row(6, "Total R", str.tostring(st.cumR, "#.0"), st.cumR >= 0 ? color.teal : color.red)
+    row(7, "Net $ (after cost)", str.tostring(st.cumNet, "#,##0"), st.cumNet >= 0 ? color.teal : color.red)
+    row(8, "Net $ / trade", fmt(n > 0 ? st.cumNet / n : na, "#,##0.00"))
+    row(9, "Profit factor", fmt(pf, "#.00"))
+    row(10, "Max DD $", str.tostring(st.ddNet, "#,##0"))
+    row(11, "Max DD R", str.tostring(st.ddR, "#.0"))
+    row(12, "Long n / net $", str.tostring(st.nLong) + " / " + str.tostring(st.netLong, "#,##0"))
+    row(13, "Short n / net $", str.tostring(st.nShort) + " / " + str.tostring(st.netShort, "#,##0"))
+    row(14, "Open trade", na(tr) ? "none" : (tr.side == 1 ? "long @ " : "short @ ") + str.tostring(tr.entryT * mt))

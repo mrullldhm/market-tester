@@ -73,6 +73,7 @@ Dev period 2010-06 .. 2021-12 unless stated. Costs as section 2.
 | T101 | Term structure (front-second spread) as intraday direction, 09:00-14:29 | 0 (dropped at spec) | not run | carry is paid to a spread position, not the outright; no cost basis |
 | T102 | Spread lead: front 08:59-09:59 residual on second month, \|r\|>=σ, hold to 14:29 | 0 (not run) | power: 80% only at 16 net ticks | underpowered (847 trades, ~150-tick noise) |
 | T201 | Spread lead, every eligible non-EIA day, hold 10:00-10:59 | 0 (not run) | power gate FAIL: D alone 70% at 4 net ticks | underpowered; family `spread_lead` closed (experiments/T10, T20) |
+| O10 | First-hour (09:00-09:59 ET) range breakout, 6 entry/stop situations (stop at 1m/5m breakout candle, SL cap, pullback limit) x SL 15-31 x TP 30-35 | 204 | best S3 (5m candle stop) -$15.57/trade, gross +$5; all 204 negative; entry-quality p 0.22-0.94; WF OOS -$16.73 | gross edge < cost; ORB again (experiments/O10, Codex replicated exactly) |
 
 P101-P110: dev 2010-06..2023-12 only, one frozen config each, replicated by Codex (`experiments/P10/`).
 
