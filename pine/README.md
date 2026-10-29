@@ -5,8 +5,7 @@ simulates a limit-order retest trade with a swing stop and a 1.1R target. A dash
 Exact rules: [`SPEC.md`](SPEC.md). Python port and parity check: [`crosscheck.py`](crosscheck.py).
 
 **Read this first.** The dashboard is an in-sample backtest of whatever history the chart has loaded. It is
-not evidence of an edge (`LESSONS.md` section 10: minute-bar indicator ideas on CL have not beaten the $24.02
-round trip). On dev data (H1 2023, 5m, defaults) the Python port gives 1,345 trades at -$42/trade after
+not evidence of an edge. On dev data (H1 2023, 5m, defaults) the Python port gives 1,345 trades at -$42/trade after
 costs (about -$18/trade before costs). TradingView charts also show 2024+ bars, which is this repo's holdout
 period: numbers read there are not a clean test.
 

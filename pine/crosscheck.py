@@ -23,9 +23,9 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from market_tester import config  # noqa: E402
-from market_tester.periods import DEV, load_period  # noqa: E402
-from market_tester.sessions import ET, add_time_columns  # noqa: E402
+from market_tester.common import config  # noqa: E402
+from market_tester.quantum.periods import DEV, load_period  # noqa: E402
+from market_tester.common.sessions import ET, add_time_columns  # noqa: E402
 
 SUPPORTED_TF = (1, 2, 3, 5, 10, 15, 20, 30, 60)
 LAST_MINUTE = 16 * 60 + 59  # 16:59 ET

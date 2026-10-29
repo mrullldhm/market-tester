@@ -4,7 +4,7 @@ Indicator `pine/wickless_sr.pine` (TradingView, Pine v6) and its Python port `pi
 these rules exactly. Replicators work from this file, not from either implementation.
 
 This is a chart tool, not a validated strategy. The dashboard shows in-sample results on whatever history the
-chart loads. See `LESSONS.md` section 10.
+chart loads.
 
 Rev 3 (after Codex spec review): resting-limit entries with trade-through and gap fills, target trade-through,
 causal session end, roll trades voided (not exited), ambiguous two-sided bars skipped, win = `net$ > 0`,

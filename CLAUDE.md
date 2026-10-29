@@ -5,11 +5,17 @@
 - **Goal order:** profitable CL strategy first (after costs, on data not used to build it); trading bot last.
 - **Intraday only:** the bot's end use is a prop firm, so every trade is flat the same session. No multi-day
   holds. Prop-firm rule details (drawdown, payout) come later, after a strategy passes.
-- **Read `LESSONS.md`** before proposing a strategy. Do not re-test a dead idea without a new angle; respect
-  the "data already seen" table.
+- **Two testers, never mixed:** `market_tester/quantum` (conservative engine + statistical gates, dev/holdout
+  lock) and `market_tester/tradingview` (TradingView Strategy Tester emulation). Shared code only in
+  `market_tester/common`. Strategies live in `strategies/quantum` or `strategies/tradingview`; reports in
+  `experiments/quantum` or `experiments/tradingview`. No imports across the two sides (`tests/test_boundary.py`).
+- Check `experiments/LEDGER.csv` for what was already run and which periods were looked at.
 - **Codex gate:** Claude builds; Codex reviews and independently replicates (`AGENTS.md`) before any result is
   called real. Give Codex a hashed pytest log, never ask it to run pytest.
 - Before the first strategy test: write down the holdout period and log every look at it.
-- Costs baseline: $4.02 fee + 1 tick slippage per side = $24.02 round trip on 1 CL. Stop and target in the same
-  minute = stop. Roll jumps are never P&L; a trade must not span two `raw_symbol`s.
+- Quantum costs: $4.02 fee round trip + 1 tick slippage per side = $24.02 round trip on 1 CL. Stop and target
+  in the same minute = stop (quantum only).
+- TradingView tester: $50,000 account, 1 CL, commission $2.01 per order ($4.02 round trip, TopstepX), slippage
+  0 + 1-tick stress, TV broker emulator fills (intrabar path). Flat by 16:10 ET (Topstep 3:10 PM CT).
+- Both: roll jumps are never P&L; a trade must not span two `raw_symbol`s.
 - Long jobs print live progress.

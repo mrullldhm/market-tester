@@ -1,7 +1,7 @@
 # Instructions for Codex
 
 This repo is a CL (NYMEX Light Crude Oil) strategy research project run by Claude (builder) with you,
-Codex, as **reviewer and independent replicator**. Read `README.md` and `LESSONS.md` first.
+Codex, as **reviewer and independent replicator**. Read `README.md` first.
 
 ## Hard rules
 - **CL only.** Never use, suggest or download MCL (Micro WTI) or any other market. MCL is non-syariah for
@@ -20,7 +20,7 @@ Codex, as **reviewer and independent replicator**. Read `README.md` and `LESSONS
    your own code. Do not import `market_tester` logic for the quantity being checked. Report your number,
    Claude's number and the difference.
 3. **Red-team** positive results: try to explain them away (outliers, a few days, one regime, roll
-   artefacts, selection across many tries, years already seen per `LESSONS.md` section 5).
+   artefacts, selection across many tries, years already looked at per `experiments/LEDGER.csv`).
 
 ## Output
 Findings first, most severe first: `severity | file:line | problem | concrete failure case | fix`. Then

@@ -11,30 +11,25 @@ Backtesting research to find a **profitable strategy on CL** (NYMEX Light Crude 
 - **Team:** Claude builds (code, tests, reports); Codex reviews adversarially and replicates headline
   numbers with its own code (see `AGENTS.md`). No result counts until Codex has checked it.
 
-Read `LESSONS.md` before proposing any strategy: it lists dead ideas, data traps and which years were
-already looked at.
+Two separate testers, never mixed (no imports across them, `tests/test_boundary.py`):
+- **quantum tester** (`market_tester/quantum`): conservative 1-lot engine (stop wins a same-minute tie, target
+  needs a trade-through, $24.02 round trip), statistical gates, dev/holdout lock.
+- **TradingView tester** (`market_tester/tradingview`): emulates the TradingView Strategy Tester broker
+  (intrabar path, limits fill on touch), $50,000 account, 1 CL, $2.01 commission per order ($4.02 round trip,
+  TopstepX), TV performance summary and list of trades. Semantics: `market_tester/tradingview/SPEC.md`.
 
 ## Layout
 | Path | What |
 |---|---|
-| `market_tester/config.py` | market (CL), tick $0.01 = $10, cost baseline, data paths, CL-only guard |
-| `market_tester/data.py` | `load_bars(years, continuous)`, `is_roll` flag, `check_same_contract` |
-| `market_tester/sessions.py` | ET clock, CME trading day (18:00 ET start), EIA ±15 min blackout |
-| `market_tester/periods.py` | `DEV` / `HOLDOUT` (fixed 2026-10-18), `load_period`; holdout needs a live prereg token |
-| `market_tester/ledger.py` | append-only `experiments/LEDGER.csv` (every run, config count per family, holdout look); `experiments/trials/` per-config Sharpe |
-| `market_tester/prereg.py` | freeze a holdout test; `open_run` opens the holdout once, ever |
-| `market_tester/strategy.py` | `Signals`, `Strategy` protocol, `per_contract`, session helpers |
-| `market_tester/engine.py` | generic numba 1-lot simulator: fill, stop/target, roll, EIA, cost rules |
-| `market_tester/metrics.py` | per-trade / per-day numbers, by year / side, drawdown |
-| `market_tester/stats.py` | day-clustered t, block bootstrap CI, Monte Carlo (risk), deflated Sharpe, Romano-Wolf, SPA, PBO |
-| `market_tester/baseline.py` | random-entry baseline (same week, minute, side, exits) |
-| `market_tester/optimize.py` | guarded grid (parallel), plateau pick, anchored walk-forward |
-| `market_tester/report.py` | `evaluate` (dev, all gates, report + ledger) and `evaluate_holdout` |
-| `market_tester/validate.py` | engine proofs: coin flip, planted edge, null control |
-| `market_tester/toys.py` | toy strategies for the proofs (not research ideas) |
-| `experiments/` | ledger, pre-registrations, reports (in git) |
-| `tests/` | `pytest` (data tests skip if `data/` is missing) |
-| `LESSONS.md` | everything worth keeping from the old `propfirm` repo |
+| `market_tester/common/` | shared: `config` (CL guard, costs, paths), `data` (bars, rolls), `sessions` (ET clock, EIA), `periods` (DEV/HOLDOUT dates, `load_range` with holdout guard), `ledger` |
+| `market_tester/quantum/` | quantum tester: `engine`, `strategy`, `metrics`, `stats`, `baseline`, `optimize`, `report` (`evaluate`), `prereg`, `periods` (holdout lock), `validate`, `toys` |
+| `market_tester/tradingview/` | TradingView tester: `script` (Pine-style orders), `broker` (emulator), `run` (chart + trade list), `report` (TV metrics), `calendar` |
+| `strategies/quantum/` | strategies tested with the quantum tester (P10 published, O10 ORB, spread lead) |
+| `strategies/tradingview/` | strategies for the TradingView tester (`orb.py`) |
+| `experiments/LEDGER.csv` | shared append-only ledger: every run, config counts, holdout looks (both testers) |
+| `experiments/quantum/`, `experiments/tradingview/` | specs, runners, reports per tester (`experiments/MOVED.md` maps old paths) |
+| `tests/common`, `tests/quantum`, `tests/tradingview`, `tests/pine` | `pytest` (data tests skip if `data/` is missing) |
+| `pine/` | wickless S/R TradingView indicator and its parity check |
 
 ## Periods (fixed 2026-10-18, before any strategy test)
 | Period | Trading days | Use |
@@ -43,9 +38,9 @@ already looked at.
 | holdout | 2024-01-01 .. 2026-10-13 | one run per pre-registered frozen config (`prereg.open_run`) |
 | forward | after 2026-10-13 | paper trading |
 
-## Testing a strategy
+## Testing a strategy (quantum tester)
 ```python
-from market_tester.report import evaluate
+from market_tester.quantum.report import evaluate
 r = evaluate(MyStrategy(), {"param": [1, 2, 3]}, item_id="S001", family="orb", hypothesis="...", n_jobs=6)
 ```
 `family` names the research idea: every variant of one idea shares it, so trials add up across renamed
@@ -77,7 +72,12 @@ Strategy rules: signals causal and stateless (no fitting over the sample; object
 indicators per contract (`per_contract`). The holdout lock guards the tester's code path only: strategy
 code must not read data files itself.
 
-Engine proofs: `python -m market_tester.validate` (coin flip, planted edge PASS, null control FAIL).
+Engine proofs: `python -m market_tester.quantum.validate` (coin flip, planted edge PASS, null control FAIL).
+
+## Testing a strategy (TradingView tester)
+Write a numba script with `market_tester.tradingview.script` orders (see `strategies/tradingview/orb.py`), then
+`Chart.from_bars(bars)`, `simulate_config`, `trade_frame`, `report.summary`. Full history needs a `holdout_look`
+ledger row (`common.periods.load_range`). ORB run: `.venv/bin/python experiments/tradingview/ORB/run.py`.
 
 ## Data (`data/`, not in git, ~1.5 GB)
 | Path | What |

@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from market_tester import config
-from market_tester.sessions import add_time_columns
+from market_tester.common import config
+from market_tester.common.sessions import add_time_columns
 
 
 def synthetic_bars(n_days: int = 1300, seed: int = 0, roll_every: int = 40, sd_ticks: float = 3.0) -> pd.DataFrame:
@@ -42,5 +42,7 @@ def synth():
 def tmp_experiments(tmp_path, monkeypatch):
     """Every test writes ledger / prereg / reports under tmp, never into the real experiments/."""
     monkeypatch.setattr(config, "EXPERIMENTS_DIR", tmp_path)
+    monkeypatch.setattr(config, "QUANTUM_EXPERIMENTS_DIR", tmp_path)
+    monkeypatch.setattr(config, "TV_EXPERIMENTS_DIR", tmp_path / "tradingview")
     monkeypatch.setattr(config, "LEDGER_FILE", tmp_path / "LEDGER.csv")
     return tmp_path
