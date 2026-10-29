@@ -74,7 +74,7 @@ def test_long_retest_to_target():
     assert (t.entry, t.stop, t.risk, t.target) == (1004, 1000, 4, 1009)  # ceil(1.1 * 4) = 5
     assert (t.exit_bar, t.exit, t.reason) == (4, 1009, "target")
     assert t.r == pytest.approx(1.25)
-    assert t.net == pytest.approx(5 * 10 - 24.02)
+    assert t.net == pytest.approx(5 * 10 - 4.02)
 
 
 def test_target_needs_one_tick_trade_through():
@@ -190,13 +190,14 @@ def test_roll_voids_open_trade_and_clears_state():
 
 
 def test_win_is_net_positive():
-    # risk 1 tick: target +2 ticks = $20 < $24.02 cost -> a target hit that loses money
+    # risk 1 tick: target +2 ticks = $20 < $24.02 cost (costRT set high) -> a target hit that loses money
+    cfg = cc.Config(tf=TF, pivLeft=1, pivRight=1, costRT=24.02)
     rows = [(1010, 1012, 1005, 1008), (1008, 1009, 1003, 1005), (1004, 1010, 1004, 1010),
             (1004, 1006, 1004, 1005), (1005, 1007, 1004, 1006)]  # bar 3 opens at the level: fill at open
-    trades, _ = run(rows)
+    trades, _ = run(rows, cfg)
     t = trades.iloc[0]
     assert (t.risk, t.target, t.reason) == (1, 1006, "target")
-    s = cc.stats(trades, CFG)
+    s = cc.stats(trades, cfg)
     assert s["win_rate"] == 0.0 and s["target_hit_rate"] == 1.0
     assert s["profit_factor"] == 0.0  # no profit, one loss
     assert math.isnan(cc.stats(trades.iloc[:0], CFG)["profit_factor"])
@@ -261,7 +262,7 @@ def test_short_retest_mirrors_long():
     t = trades.iloc[0]
     assert series["det"][2] == -1 and series["entry_side"][3] == -1
     assert (t.side, t.entry, t.stop, t.target, t.exit, t.reason) == (-1, 996, 1000, 991, 991, "target")
-    assert t.net == pytest.approx(5 * 10 - 24.02)
+    assert t.net == pytest.approx(5 * 10 - 4.02)
 
 
 def test_short_stop_gap_fills_at_open():

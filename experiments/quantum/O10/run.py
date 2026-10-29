@@ -40,7 +40,7 @@ N_BOOT, N_RW, N_RANDOM, N_POWER_DRAWS = 49_999, 1_999, 999, 20
 DEAD_ORB = 1_056_000
 BLOCK = (2019, 2023)
 CUT = pd.Timestamp("2017-01-01")
-ROUND_TRIP = 24.02
+ROUND_TRIP = 2 * config.FEE_PER_SIDE + 2 * config.SLIPPAGE_TICKS_PER_SIDE * config.TICK_VALUE  # $4.02 baseline
 
 
 def md(df: pd.DataFrame, index: bool = True) -> str:
@@ -125,7 +125,7 @@ def describe(t: pd.DataFrame, t2: pd.DataFrame, days: orb.Days, cfg: dict) -> di
     beyond = (-t["gross_ticks"] > cfg["sl"]).mean() if cfg["sl"] else float("nan")
     return {**cfg, "trades": s["trades"], "win_rate": s.get("win_rate", np.nan),
             "gross_usd_per_trade": float(t["gross_ticks"].mean() * config.TICK_VALUE) if len(t) else np.nan,
-            "net_usd_per_trade": s["net_usd_per_trade"], "net_2tick": float(t2["net_usd"].mean()) if len(t2) else np.nan,
+            "net_usd_per_trade": s["net_usd_per_trade"], "net_stress": float(t2["net_usd"].mean()) if len(t2) else np.nan,
             "profit_factor": s.get("profit_factor", np.nan), "max_dd": s.get("max_drawdown_usd", np.nan),
             "total_net": s["total_net_usd"], "block_trades": len(blk), "block_net": float(blk["net_usd"].sum()),
             "best_week_out": best_week_out(t), "years_pos": f"{int((years > 0).sum())}/{len(years)}",
@@ -145,11 +145,18 @@ def lookahead_ok(bars: pd.DataFrame, cfg: dict, full: pd.DataFrame) -> bool:
     return bool(a.equals(part[cols].reset_index(drop=True)))
 
 
-def grid() -> None:
+def grid(owner_override: bool = False) -> None:
     p = OUT / "power.json"
     pw = json.loads(p.read_text()) if p.exists() else {}
     if not pw.get("proceed"):
-        raise SystemExit("stage 1 power check has not returned PROCEED")
+        if not owner_override:
+            raise SystemExit("stage 1 power check has not returned PROCEED")
+        rows = pw.get("rows", [])
+        if len(rows) != 6 or not all(np.isfinite(r.get("mde_usd", np.nan)) and r.get("trades", 0) > 0 for r in rows):
+            raise SystemExit("override covers only an MDE above the cost; this power file is incomplete or NaN")
+        ledger.append("O10", "decision", "dev", family="orb", verdict="OVERRIDE", code_sha256=ledger.code_sha256(),
+                      note="owner 2026-10-29: re-run the grid at the $4.02 TopstepX cost although stage 1 says STOP "
+                           "(MDE > round trip): an edge near the cost is not detectable; results are low-power")
     if pw.get("bundle_sha256") != bundle_sha256():
         raise SystemExit("spec, simulator or runner changed since the power check: rerun stage 1")
     code = ledger.code_sha256()
@@ -168,7 +175,7 @@ def grid() -> None:
     pnl, cnt = np.zeros((len(days.day), len(configs))), np.zeros((len(days.day), len(configs)))
     for q, cfg in enumerate(configs):
         t = orb.backtest(days, **cfg)
-        t2 = orb.backtest(days, **cfg, slip_ticks=2)
+        t2 = orb.backtest(days, **cfg, slip_ticks=config.STRESS_SLIPPAGE_TICKS)
         pnl[:, q] = orb.day_pnl(t, days)
         cnt[:, q] = t.groupby("trading_day").size().reindex(days.day, fill_value=0).to_numpy()
         trades_of[q] = t
@@ -182,7 +189,8 @@ def grid() -> None:
     print("[O10] Romano-Wolf, PBO, walk-forward ...", flush=True)
     df["romano_wolf_p"] = romano_wolf(pnl, n_boot=N_RW, seed=0)["p_adj"]
     pbo = pbo_cscv(pnl, n_blocks=16, max_combos=20_000, seed=0)["pbo"]
-    res = GridResult({"config": list(range(len(configs)))}, configs, days.day, pnl, cnt, 1)
+    res = GridResult({"config": list(range(len(configs)))}, configs, days.day, pnl, cnt,
+                     config.SLIPPAGE_TICKS_PER_SIDE)
     wf = walk_forward(res, min_train_years=3, use_plateau=False)
 
     pick = int(np.argmax(df["day_sharpe"].to_numpy()))
@@ -199,7 +207,7 @@ def grid() -> None:
     look = lookahead_ok(bars, configs[pick], trades_of[pick])
     pk = df.loc[pick]
     gates = {"trades >= 300": pk["trades"] >= 300, "net > 0": pk["net_usd_per_trade"] > 0,
-             "net > 0 at 2 ticks": pk["net_2tick"] > 0, "Bonferroni p <= 0.05": pk["bonferroni_p"] <= 0.05,
+             f"net > 0 at {config.STRESS_SLIPPAGE_TICKS} tick slip": pk["net_stress"] > 0, "Bonferroni p <= 0.05": pk["bonferroni_p"] <= 0.05,
              "entry-quality p <= 0.05": pk["random_p"] <= 0.05, "walk-forward OOS > 0": wf["total_net_usd"] > 0,
              "PBO <= 0.3": pbo <= 0.3, "2019-23 block > 0, >= 100 trades": pk["block_net"] > 0 and pk["block_trades"] >= 100,
              "best week out > 0": pk["best_week_out"] > 0, "look-ahead unchanged": look}
@@ -223,7 +231,7 @@ def grid() -> None:
                                           median_gross=("gross_usd_per_trade", "median"),
                                           median_trades=("trades", "median"), min_bonf_p=("bonferroni_p", "min"))
     per_sit.insert(0, "sharpe_best_net", [df.at[best[s], "net_usd_per_trade"] for s in per_sit.index])
-    cols = ["situation", "sl", "tp", "trades", "win_rate", "gross_usd_per_trade", "net_usd_per_trade", "net_2tick",
+    cols = ["situation", "sl", "tp", "trades", "win_rate", "gross_usd_per_trade", "net_usd_per_trade", "net_stress",
             "profit_factor", "max_dd", "block_net", "best_week_out", "years_pos", "long_net", "short_net",
             "loss_beyond_sl", "window_mae_p90", "window_mae_max", "stop_q10_50_90", "day_sharpe", "boot_p",
             "bonferroni_p", "romano_wolf_p", "random_p", "random_real", "random_null_mean"]
@@ -233,7 +241,7 @@ def grid() -> None:
     text = (f"# O10 dev results (Claude's numbers, not yet replicated by Codex)\n\n"
             f"SPEC rev 4 sha {spec_sha[:12]}, code {code[:12]}. Dev {DEV.first_day.date()}..{DEV.last_day.date()}, "
             f"{len(days.day):,} eligible days ({len(days.short_days)} scheduled short sessions not traded, data "
-            f"failures excluded: {[str(d.date()) for d in days.data_failures]}), $24.02 round trip. {N_CONFIGS} configs (Bonferroni is O10-only; dead "
+            f"failures excluded: {[str(d.date()) for d in days.data_failures]}), ${ROUND_TRIP:.2f} round trip (TopstepX commission; stress {config.STRESS_SLIPPAGE_TICKS} tick/side). {N_CONFIGS} configs (Bonferroni is O10-only; dead "
             f"ORB trials {DEAD_ORB:,} not corrected for). PBO over the 204: {pbo:.3f}. Walk-forward OOS "
             f"{wf['trades']} trades, net ${wf['net_usd_per_trade']:.2f}/trade, total ${wf['total_net_usd']:,.0f}.\n\n"
             f"## O10 pick: S{pk['situation']} sl {pk['sl']} tp {pk['tp']} (highest per-day Sharpe)\n\n"
@@ -265,5 +273,7 @@ if __name__ == "__main__":
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--power", action="store_true")
     g.add_argument("--grid", action="store_true")
+    ap.add_argument("--owner-override-power", action="store_true",
+                    help="run the grid after a stage-1 STOP (owner decision, logged in the ledger)")
     args = ap.parse_args()
-    power() if args.power else grid()
+    power() if args.power else grid(args.owner_override_power)

@@ -242,7 +242,7 @@ def test_engine_rejects_bad_bars(synth):
         Market.from_bars(pd.concat([head.iloc[:5], head.iloc[4:6]], ignore_index=True))
 
 
-@pytest.mark.parametrize("kw", [{"slip_ticks": 0}, {"slip_ticks": False}, {"slip_ticks": float("nan")},
+@pytest.mark.parametrize("kw", [{"slip_ticks": -1}, {"slip_ticks": False}, {"slip_ticks": float("nan")},
                                 {"gates": {"min_trades": 1}}, {"gates": {"dsr_min": 0.5}},
                                 {"gates": {"romano_wolf_p_max": 1.0}}, {"gates": {"recent_years": [2010, 2011]}},
                                 {"gates": {"made_up": 1}}, {"gates": {"pbo_max": float("nan")}}])

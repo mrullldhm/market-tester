@@ -16,7 +16,7 @@ from pandas.tseries.holiday import (AbstractHolidayCalendar, Holiday, USLaborDay
                                     USMemorialDay, USPresidentsDay, USThanksgivingDay, nearest_workday)
 
 from market_tester.quantum.baseline import week_permutation
-from market_tester.common.config import FEE_PER_SIDE, TICK_VALUE, assert_allowed
+from market_tester.common.config import FEE_PER_SIDE, SLIPPAGE_TICKS_PER_SIDE, TICK_VALUE, assert_allowed
 from market_tester.common.data import RollCrossed
 from market_tester.quantum.engine import FLAT, REASONS, STOP, TARGET, validate_bars, with_costs
 
@@ -284,7 +284,7 @@ def run(days: Days, situation: int, sl: int, tp: int) -> pd.DataFrame:
         "signal_bar": sig, "stop_dist": dist, "window_mae": mae})
 
 
-def backtest(days: Days, situation: int, sl: int, tp: int, slip_ticks: float = 1) -> pd.DataFrame:
+def backtest(days: Days, situation: int, sl: int, tp: int, slip_ticks: float = SLIPPAGE_TICKS_PER_SIDE) -> pd.DataFrame:
     return with_costs(run(days, situation, sl, tp), slip_ticks)
 
 
@@ -335,7 +335,7 @@ def _shuffled(days: Days, ent: pd.DataFrame, n_draws: int, seed: int):
         yield week_permutation(week, rng)[dq]
 
 
-def null_draws(days: Days, ent: pd.DataFrame, tp: int, n_draws: int, seed: int, slip_ticks: float = 1):
+def null_draws(days: Days, ent: pd.DataFrame, tp: int, n_draws: int, seed: int, slip_ticks: float = SLIPPAGE_TICKS_PER_SIDE):
     """Entry-quality benchmark draws. Returns (per-draw means, valid flags)."""
     means, valid = np.full(n_draws, np.nan), np.zeros(n_draws, bool)
     for r, partner in enumerate(_shuffled(days, ent, n_draws, seed)):
@@ -348,7 +348,7 @@ def null_draws(days: Days, ent: pd.DataFrame, tp: int, n_draws: int, seed: int, 
 
 
 def entry_quality(days: Days, trades: pd.DataFrame, tp: int, n_draws: int = 999, seed: int = 0,
-                  slip_ticks: float = 1) -> dict:
+                  slip_ticks: float = SLIPPAGE_TICKS_PER_SIDE) -> dict:
     """SPEC 'Entry-quality benchmark': the real signals and the week-shuffled ones both enter at the open of
     the minute after the signal minute, with the same stop distance, TP and market costs. p = (1 + #valid draws
     with mean >= real) / (1 + #valid draws); NaN if too few valid draws or real signals kept."""
@@ -404,7 +404,7 @@ def _variance_trades(o, h, l, blk_seen, bstart, bend, i1_of, fj_of, fpx_of, j0, 
 
 
 def variance_draws(days: Days, ent: pd.DataFrame, situation: int, sl: int, tp: int, n_draws: int, seed: int,
-                   slip_ticks: float = 1) -> np.ndarray:
+                   slip_ticks: float = SLIPPAGE_TICKS_PER_SIDE) -> np.ndarray:
     """SPEC stage 1: pooled per-trade net $ of the variance model on week-shuffled days at each entry's fill
     minute. Uses entries only (`entries`), never the real trades' outcomes."""
     minute = days.et_minute[ent["entry_bar"].to_numpy(np.int64)] - WINDOW_FIRST

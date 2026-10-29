@@ -90,7 +90,7 @@ def _series(x, p, n):
 
 
 def _sim(i, k, size, is_d, pos, n_days, in_h, h_pos, n_h, recent, sharpes, holdout):
-    """Simulated gates: trades, net > 0, 2-tick stress, profitability p, 2019-23 block, global DSR; D gate;
+    """Simulated gates: trades, net > 0, stress-slippage, profitability p, 2019-23 block, global DSR; D gate;
     holdout gates. Not simulated (they can only lower power, so dev power is an upper bound): random-entry,
     walk-forward, look-ahead."""
     rng = np.random.default_rng(i)  # common random numbers: same sides for sim i at every k
@@ -194,7 +194,7 @@ def power() -> None:
             f"{len(size)} dev trades ({is_d.sum()} D), unsigned 10:00 -> exit move, random sides (common across k), "
             f"B = {N_BOOT}. Holdout proxy {HOLDOUT_PROXY[0]}..{HOLDOUT_PROXY[1]}: {in_h.sum()} trades "
             f"({(is_d & in_h).sum()} D). Exits not at 10:59: {late} (latest ET minute {latest}).\n"
-            "Simulated dev gates: trades, net > 0, 2-tick stress, profitability p <= 0.002, 2019-23 block, global DSR; "
+            "Simulated dev gates: trades, net > 0, stress-slippage, profitability p <= 0.002, 2019-23 block, global DSR; "
             "not simulated: random-entry, walk-forward, look-ahead, so dev power is an upper bound.\n\n"
             "| k net ticks | sims | dev all gates | dev + D | D alone | dev + D 95% LB | D alone 95% LB | holdout proxy |\n"
             "|---|---|---|---|---|---|---|---|\n"

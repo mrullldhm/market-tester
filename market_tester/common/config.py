@@ -12,7 +12,8 @@ ALLOWED_ROOTS = frozenset({"CL"})
 TICK = 0.01  # $ per barrel
 TICK_VALUE = 10.0  # $ per tick on 1 contract (1,000 barrels)
 FEE_PER_SIDE = 2.01  # $ per contract per side; $4.02 round trip (TopstepX CL, help.topstep.com 8284213)
-SLIPPAGE_TICKS_PER_SIDE = 1
+SLIPPAGE_TICKS_PER_SIDE = 0  # baseline: TopstepX commission only (owner 2026-10-29); slippage is a stress
+STRESS_SLIPPAGE_TICKS = 1  # stress test / gate: 1 tick per market fill per side
 
 REPO_ROOT = Path(__file__).resolve().parents[2]  # market_tester/common/config.py -> repo
 ROOT = REPO_ROOT

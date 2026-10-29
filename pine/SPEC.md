@@ -51,7 +51,7 @@ CL-only guard, input domains, resampling and warm-up defined.
 | `stFactor`, `stAtrLen` | 3.0, 10 | float >= 0.1, int >= 1 | |
 | `filterArrows` | false | bool | also drop detections (arrow and level) that fail the filters |
 | `qty` | 1 | int >= 1 | contracts |
-| `costRT` | 24.02 | float >= 0 | $ per contract per round trip |
+| `costRT` | 4.02 | float >= 0 | $ per contract per round trip (TopstepX CL commission) |
 
 `pointValue` = $ per 1.00 price move per contract (`syminfo.pointvalue`; CL = 1000). One tick = $10 on CL.
 

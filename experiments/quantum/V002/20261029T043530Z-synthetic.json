@@ -1,0 +1,202 @@
+{
+  "item_id": "V002",
+  "family": "V002",
+  "hypothesis": "toy on clean bars (null control)",
+  "strategy": "market_tester.quantum.toys:MorningMomentum",
+  "kind": "synthetic",
+  "start_run_id": "V002-synthetic",
+  "configs_all_families": 554,
+  "period": "2010-06-07..2023-12-29",
+  "grid": {
+    "minute": [
+      598
+    ],
+    "anchor": [
+      510,
+      540,
+      570
+    ],
+    "hold": [
+      50,
+      60,
+      70
+    ]
+  },
+  "n_configs": 9,
+  "n_trials": 9,
+  "sharpe_var": 8.844302902496458e-05,
+  "global_dsr": null,
+  "pick": {
+    "minute": 598,
+    "anchor": 540,
+    "hold": 60
+  },
+  "slip_ticks": 0,
+  "summary": {
+    "trades": 3456,
+    "days": 3491,
+    "trades_per_year": 249.47350329418506,
+    "net_usd_per_trade": 4.261250000000016,
+    "gross_ticks_per_trade": 0.828125,
+    "net_ticks_per_trade": 0.828125,
+    "total_net_usd": 14726.880000000056,
+    "win_rate": 0.49016203703703703,
+    "profit_factor": 1.0229915936915308,
+    "sharpe_annual": 0.1286401990228248,
+    "max_drawdown_usd": 31927.74000000056,
+    "long_share": 0.49710648148148145,
+    "exits": {
+      "time": 3456
+    }
+  },
+  "dsr": {
+    "dsr": 0.36439384554224086,
+    "sr": 0.008104731725459398,
+    "sr0": 0.014302029837374016,
+    "n_trials": 9,
+    "n_obs_eff": 3133.0307414180693
+  },
+  "romano_wolf_p_pick": 0.6327345309381237,
+  "spa_p": 0.5209580838323353,
+  "pbo": {
+    "pbo": 0.47016317016317016,
+    "splits": 12870,
+    "logit_median": 0.4054651081081642
+  },
+  "clustered": {
+    "mean": 4.261250000000016,
+    "se": 8.89992081393246,
+    "t": 0.4787963948318736,
+    "p_one_sided": 0.3160417408368553,
+    "n": 3456,
+    "days": 3456
+  },
+  "bootstrap": {
+    "per_day": 4.218527642509326,
+    "per_day_ci": [
+      -15.27628057863075,
+      23.240326410770564
+    ],
+    "per_trade": 4.261250000000016,
+    "per_trade_ci": [
+      -15.425363733141387,
+      23.458541406555298
+    ],
+    "p_per_trade_le_0": 0.324,
+    "conf": 0.95,
+    "n_boot": 500,
+    "mean_block_days": 5.0
+  },
+  "monte_carlo": {
+    "trades": 3456,
+    "actual_max_dd": 31927.74000000056,
+    "shuffle_max_dd": {
+      "p50": 28733.450000000426,
+      "p95": 44811.942999999614,
+      "p99": 52184.65019999877
+    },
+    "resample_unit": "day blocks",
+    "resample_max_dd": {
+      "p50": 30197.060000000332,
+      "p95": 63610.30299999865,
+      "p99": 77377.38379999861
+    },
+    "resample_total": {
+      "p5": -38870.02499999994,
+      "p50": 16479.92000000005,
+      "p95": 70071.32200000003
+    },
+    "p_total_le_0": 0.302
+  },
+  "random_entry": {
+    "draws": 100,
+    "accepted": 100,
+    "real_net_usd_per_trade": 4.261250000000016,
+    "random_net_usd_per_trade_mean": -6.585244449367715,
+    "random_p5_p95": [
+      -21.597350484421643,
+      4.098535888803129
+    ],
+    "random_trades_median": 3452,
+    "real_trades": 3456,
+    "match_rate_median": 0.9988425925925926,
+    "eligible_mask": false,
+    "p": 0.0594059405940594
+  },
+  "lookahead": {
+    "ok": true,
+    "cuts": 30,
+    "decision_cuts": 20,
+    "changed_at_bars": []
+  },
+  "walk_forward": {
+    "trades": 2776,
+    "total_net_usd": 11430.480000000043,
+    "net_usd_per_trade": 4.117608069164281
+  },
+  "gates": [
+    {
+      "gate": "trades",
+      "value": 3456,
+      "rule": ">= 100",
+      "pass": true
+    },
+    {
+      "gate": "net $/trade",
+      "value": 4.261250000000016,
+      "rule": "> 0.0",
+      "pass": true
+    },
+    {
+      "gate": "Romano-Wolf p (pick)",
+      "value": 0.6327345309381237,
+      "rule": "<= 0.05",
+      "pass": false
+    },
+    {
+      "gate": "deflated Sharpe",
+      "value": 0.36439384554224086,
+      "rule": ">= 0.95",
+      "pass": false
+    },
+    {
+      "gate": "random-entry p",
+      "value": 0.0594059405940594,
+      "rule": "<= 0.05",
+      "pass": false
+    },
+    {
+      "gate": "walk-forward OOS net $/trade",
+      "value": 4.117608069164281,
+      "rule": "> 0.0",
+      "pass": true
+    },
+    {
+      "gate": "PBO",
+      "value": 0.47016317016317016,
+      "rule": "<= 0.3",
+      "pass": false
+    },
+    {
+      "gate": "net $/trade 2019-2023",
+      "value": 19.295132605304225,
+      "rule": "> 0",
+      "pass": true
+    },
+    {
+      "gate": "net $/trade at 1 tick slip",
+      "value": -15.738749999999982,
+      "rule": "> 0",
+      "pass": false
+    },
+    {
+      "gate": "look-ahead (signals before cut)",
+      "value": true,
+      "rule": "unchanged",
+      "pass": true
+    }
+  ],
+  "verdict": "FAIL",
+  "code_sha256": "9d70ef73d7083a7f5ac782b40ac0d25caccbcb9c793c73eaae472f36a53194bf",
+  "seconds": 48.7
+}

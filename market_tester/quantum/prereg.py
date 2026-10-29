@@ -23,11 +23,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ..common import config, ledger
+from ..common.config import SLIPPAGE_TICKS_PER_SIDE, STRESS_SLIPPAGE_TICKS
 
 REQUIRED = ["item_id", "hypothesis", "strategy", "params", "period", "gates", "slip_ticks", "seed",
             "approved_by_user", "codex_review"]
 STOPPING_RULE = "one run; never re-run, extended or re-registered"
-HOLDOUT_GATES = {"min_trades": 100, "net_usd_per_trade_gt": 0.0, "p_one_sided_max": 0.05, "stress_slip_ticks": 2}
+HOLDOUT_GATES = {"min_trades": 100, "net_usd_per_trade_gt": 0.0, "p_one_sided_max": 0.05, "stress_slip_ticks": STRESS_SLIPPAGE_TICKS}
 _HIGHER_IS_STRICTER = {"min_trades": True, "net_usd_per_trade_gt": True, "p_one_sided_max": False,
                        "stress_slip_ticks": True}
 
@@ -88,8 +89,8 @@ def holdout_gates(overrides: dict) -> dict:
 
 
 def check_slip(slip_ticks) -> None:
-    if not _is_number(slip_ticks) or slip_ticks < 1:
-        raise PreregError("slip_ticks must be a finite number >= 1 (the cost baseline)")
+    if not _is_number(slip_ticks) or slip_ticks < SLIPPAGE_TICKS_PER_SIDE:
+        raise PreregError(f"slip_ticks must be a finite number >= {SLIPPAGE_TICKS_PER_SIDE} (the cost baseline)")
 
 
 def validate(spec: dict) -> None:

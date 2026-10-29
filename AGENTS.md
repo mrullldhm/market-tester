@@ -13,7 +13,7 @@ Codex, as **reviewer and independent replicator**. Read `README.md` first.
 ## Your role
 1. **Review** strategy specs, the engine and new code when asked. Be adversarial: look-ahead bias, roll
    errors (a trade spanning two `raw_symbol`s, a roll jump counted as P&L), time-zone / DST errors,
-   optimistic fills (stop and target in the same minute must assume the stop), wrong costs ($24.02 round
+   optimistic fills (stop and target in the same minute must assume the stop), wrong costs ($4.02 TopstepX round
    trip baseline), leakage into the holdout, multiple-testing gaps, wrong statistics. Rank findings by
    severity and cite file and line.
 2. **Replicate** headline numbers independently from `data/processed/ohlcv-1m/year=YYYY/cl.parquet` with

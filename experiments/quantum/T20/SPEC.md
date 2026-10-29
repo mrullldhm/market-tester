@@ -81,3 +81,7 @@ Novelty gate had passed (agreement P101 49.9%, P102 51.7%). No dev run, no trial
 Per this spec a fail ends family `spread_lead`; no exit / window / threshold variant may follow.
 Codex R-T20-5 (agreed): the global DSR here is mis-specified (own Sharpe in its own variance pool; P101-P110 are
 not an exchangeable null; double-counts the Bonferroni p). D alone fails regardless, so the stop stands.
+
+## Cost change (2026-10-29, ledger D005)
+Costs above ($24.02, 2-tick stress) are superseded for any new run: TopstepX commission $4.02 round trip,
+slippage 0, 1-tick stress gate. The runners read the new values from `common.config`.

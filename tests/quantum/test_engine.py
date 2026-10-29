@@ -133,9 +133,9 @@ def test_flat_exit_at_close():
 def test_costs_baseline_round_trip():
     bars = make_bars([FLAT_BAR] * 3)
     t = with_costs(run(Market.from_bars(bars), Signals(sides(3, 0), hold_minutes=1)))
-    assert t["net_usd"].iloc[0] == pytest.approx(-24.02)
-    stressed = with_costs(t, slip_ticks=2)
-    assert stressed["net_usd"].iloc[0] == pytest.approx(-44.02)
+    assert t["net_usd"].iloc[0] == pytest.approx(-4.02)  # TopstepX CL commission, no slippage
+    stressed = with_costs(t, slip_ticks=1)
+    assert stressed["net_usd"].iloc[0] == pytest.approx(-24.02)  # + 1 tick on both market fills
 
 
 def test_bad_signals_rejected():

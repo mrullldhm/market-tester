@@ -62,7 +62,7 @@ class Config:
     stAtrLen: int = 10
     filterArrows: bool = False
     qty: int = 1
-    costRT: float = 24.02
+    costRT: float = 4.02  # TopstepX CL commission per round trip
 
     def __post_init__(self):
         checks = {

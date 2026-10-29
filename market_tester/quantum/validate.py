@@ -1,7 +1,7 @@
 """Engine proofs on dev data (README roadmap step 3). Run: python -m market_tester.validate [--quick]
 
-1. coin flip     long + short at the same random minutes: each pair nets exactly -2 x $24.02; one random
-                 side per pair loses about $24.02 (z within +-2.58)
+1. coin flip     long + short at the same random minutes: each pair nets exactly -2 x $4.02 (no slippage); one random
+                 side per pair loses about $4.02 (z within +-2.58)
 2. planted edge  add a known momentum drift after 10:00 ET; the morning-momentum toy must find it and PASS
 3. null control  the same toy on clean bars must FAIL the gates
 """

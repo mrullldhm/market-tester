@@ -13,6 +13,7 @@ If the real net per trade is not above most draws, the "edge" is drift or the ex
 import numpy as np
 import pandas as pd
 
+from ..common.config import SLIPPAGE_TICKS_PER_SIDE
 from .engine import Market, run, with_costs
 from .strategy import Signals
 
@@ -69,7 +70,7 @@ def random_entry_signals(market: Market, trades: pd.DataFrame, sig: Signals, rng
                    flat=sig.flat, flat_day_end=sig.flat_day_end, max_fill_delay_min=sig.max_fill_delay_min)
 
 
-def random_entry_test(market: Market, trades: pd.DataFrame, sig: Signals, slip_ticks: float = 1,
+def random_entry_test(market: Market, trades: pd.DataFrame, sig: Signals, slip_ticks: float = SLIPPAGE_TICKS_PER_SIDE,
                       n_draws: int = 200, seed: int = 0, min_match: float = 0.9, progress: bool = False,
                       eligible: np.ndarray | None = None) -> dict:
     """p = share of accepted draws whose net per trade is >= the real one (+1 smoothing). nan if fewer than

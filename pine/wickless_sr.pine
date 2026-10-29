@@ -26,7 +26,7 @@ maxRiskTicks  = input.int(0, "Max risk (ticks, 0 = off)", minval = 0, group = G_
 rr            = input.float(1.1, "Reward : risk", minval = 0.1, step = 0.1, group = G_TRD)
 flatSession   = input.bool(true, "Flat at session end", group = G_TRD)
 qty           = input.int(1, "Contracts", minval = 1, group = G_TRD)
-costRT        = input.float(24.02, "Cost per contract round trip ($)", minval = 0, group = G_TRD)
+costRT        = input.float(4.02, "Cost per contract round trip ($)", minval = 0, group = G_TRD)
 showBoxes     = input.bool(true, "Draw trade boxes", group = G_TRD)
 
 G_RIB = "Filter: MA ribbon"

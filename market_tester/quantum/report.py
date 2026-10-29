@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 
 from ..common import config, ledger
+from ..common.config import SLIPPAGE_TICKS_PER_SIDE, STRESS_SLIPPAGE_TICKS
 from . import prereg
 from .baseline import random_entry_test
 from .engine import Market, run, with_costs
@@ -35,7 +36,7 @@ DEFAULT_GATES = {
     "walk_forward_net_gt": 0.0,
     "pbo_max": 0.3,
     "recent_years": [2019, 2023],  # this block alone must be net positive (edges decayed after ~2015)
-    "stress_slip_ticks": 2,  # still net positive with this slippage per side
+    "stress_slip_ticks": STRESS_SLIPPAGE_TICKS,  # still net positive with this slippage per side
 }
 _DEV_HIGHER_IS_STRICTER = {"min_trades": True, "net_usd_per_trade_gt": True, "romano_wolf_p_max": False,
                            "dsr_min": True, "random_entry_p_max": False, "walk_forward_net_gt": True,
@@ -103,7 +104,7 @@ def _write(item_id: str, tag: str, md: str, numbers: dict) -> Path:
 
 
 def evaluate(strategy, grid: dict, *, item_id: str, hypothesis: str, bars: pd.DataFrame | None = None,
-             years: list[int] | None = None, gates: dict | None = None, slip_ticks: float = 1, n_jobs: int = 1,
+             years: list[int] | None = None, gates: dict | None = None, slip_ticks: float = SLIPPAGE_TICKS_PER_SIDE, n_jobs: int = 1,
              n_boot: int = 2000, n_random: int = 200, n_mc: int = 5000, capital: float | None = None,
              seed: int = 0, write: bool = True, kind: str = "dev", family: str | None = None,
              global_dsr: dict | None = None) -> dict:

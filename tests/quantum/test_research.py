@@ -96,7 +96,7 @@ def test_prereg_frozen_inputs(tmp_experiments, data_file):
 
 
 def test_prereg_rejects_bad_specs(tmp_experiments, data_file):
-    bad = [dict(SPEC, approved_by_user=False), dict(SPEC, params=[{"a": 1}]), dict(SPEC, slip_ticks=0),
+    bad = [dict(SPEC, approved_by_user=False), dict(SPEC, params=[{"a": 1}]), dict(SPEC, slip_ticks=-1),
            dict(SPEC, gates={"min_trades": 0}), dict(SPEC, gates={"p_one_sided_max": 1}),
            dict(SPEC, gates={"stress_slip_ticks": -1}), dict(SPEC, gates={"net_usd_per_trade_gt": -100}),
            dict(SPEC, gates={"made_up": 1}), dict(SPEC, strategy="market_tester.quantum.toys:CoinFlip")]

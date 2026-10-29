@@ -82,3 +82,8 @@ and both concentration checks. Ties in Holm keep input order; p-values are not r
 ## Codex
 R-P10-1 spec review (done, all findings applied above). Next: code review with a hashed test log, then
 independent replication of trades, gross and net $/trade for all ten before any result is called real.
+
+## Cost change (2026-10-29, owner)
+Baseline cost is now the TopstepX CL commission only: $4.02 round trip per contract ($2.01 per side), slippage
+0. The slippage stress gate is 1 tick per side (was: 1 tick baseline, 2-tick stress). Results before this date
+used $24.02; they are archived next to the new ones. Ledger decision rows record the re-run.

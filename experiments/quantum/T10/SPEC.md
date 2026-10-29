@@ -139,3 +139,7 @@ dev (spec limit 10) and the holdout proxy reaches only 38% at 20 ticks. Owner ch
 running an underpowered test. No dev trial was spent: family `spread_lead` has a power `decision` row only, no
 `dev_start`. Seen so far: dev signal inputs (eligibility, r, d0, A/D split) and the unsigned size of the
 10:00 -> 14:29 move on 847 signal days. Next design: work with Codex (see T20).
+
+## Cost change (2026-10-29, ledger D005)
+Costs above ($24.02, 2-tick stress) are superseded for any new run: TopstepX commission $4.02 round trip,
+slippage 0, 1-tick stress gate. The runners read the new values from `common.config`.

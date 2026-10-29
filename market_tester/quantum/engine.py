@@ -8,7 +8,8 @@
 - target = limit order: needs a 1-tick trade-through, fills at the target price, never slipped;
 - stop and target inside the same bar = stop;
 - position is closed at the close of the last bar of each contract (a trade never spans a roll);
-- every market fill (entry, stop, time, signal, flat, roll) pays `slip` ticks; fees on both sides.
+- every market fill (entry, stop, time, signal, flat, roll) pays `slip` ticks (baseline 0, stress 1); fees
+  $2.01 on both sides ($4.02 round trip, TopstepX CL).
 
 Prices are integer ticks. The path never depends on slippage, so costs are applied afterwards
 (`with_costs`) and a slippage stress test needs no re-run.

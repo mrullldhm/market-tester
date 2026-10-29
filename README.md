@@ -13,7 +13,9 @@ Backtesting research to find a **profitable strategy on CL** (NYMEX Light Crude 
 
 Two separate testers, never mixed (no imports across them, `tests/test_boundary.py`):
 - **quantum tester** (`market_tester/quantum`): conservative 1-lot engine (stop wins a same-minute tie, target
-  needs a trade-through, $24.02 round trip), statistical gates, dev/holdout lock.
+  needs a trade-through), statistical gates, dev/holdout lock.
+- **Costs, both testers:** TopstepX CL commission $4.02 round trip per contract ($2.01 per side); slippage 0
+  in the baseline, 1 tick per side as a separate stress (a gate in the quantum tester).
 - **TradingView tester** (`market_tester/tradingview`): emulates the TradingView Strategy Tester broker
   (intrabar path, limits fill on touch), $50,000 account, 1 CL, $2.01 commission per order ($4.02 round trip,
   TopstepX), TV performance summary and list of trades. Semantics: `market_tester/tradingview/SPEC.md`.
@@ -44,7 +46,7 @@ from market_tester.quantum.report import evaluate
 r = evaluate(MyStrategy(), {"param": [1, 2, 3]}, item_id="S001", family="orb", hypothesis="...", n_jobs=6)
 ```
 `family` names the research idea: every variant of one idea shares it, so trials add up across renamed
-items. A dev run always covers the whole dev period with the $24.02 baseline (or worse) and default (or
+items. A dev run always covers the whole dev period with the $4.02 baseline (or worse) and default (or
 stricter) gates; only its PASS makes a candidate. `kind="exploratory"` allows `years=[...]` for a quick
 partial look: trials still count, verdict is `EXPLORATORY-*`, never a candidate. `evaluate` logs a `dev_start` row (config count) before it loads data, loads dev bars, runs the
 grid, picks by plateau-smoothed Sharpe, and gates the pick:
@@ -52,14 +54,14 @@ grid, picks by plateau-smoothed Sharpe, and gates the pick:
 | Gate | Default | Answers |
 |---|---|---|
 | trades | >= 300 | enough sample |
-| net $/trade | > 0 | profitable after $24.02 round trip |
+| net $/trade | > 0 | profitable after the $4.02 TopstepX commission |
 | Romano-Wolf p | <= 0.05 | real inside the grid family |
 | deflated Sharpe | >= 0.95 | beats best-of-N luck, N = every config ever run for the item |
 | random-entry p | <= 0.05 | entries beat random entries (same week, minute, side, exits) |
 | walk-forward OOS | > 0 | picks made only from earlier years still earn |
 | PBO | <= 0.3 | in-sample best is not usually an OOS loser |
 | 2019-23 block | > 0 | edge has not decayed |
-| 2 tick slippage | > 0 | survives worse fills |
+| 1 tick slippage | > 0 | survives worse fills (+$10 per market fill) |
 | look-ahead | unchanged | signal at a cut bar does not change when the future is removed |
 
 Also reported: day-clustered t, block-bootstrap CI per trade, Monte Carlo drawdown (trade reshuffle and

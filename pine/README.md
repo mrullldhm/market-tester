@@ -5,8 +5,8 @@ simulates a limit-order retest trade with a swing stop and a 1.1R target. A dash
 Exact rules: [`SPEC.md`](SPEC.md). Python port and parity check: [`crosscheck.py`](crosscheck.py).
 
 **Read this first.** The dashboard is an in-sample backtest of whatever history the chart has loaded. It is
-not evidence of an edge. On dev data (H1 2023, 5m, defaults) the Python port gives 1,345 trades at -$42/trade after
-costs (about -$18/trade before costs). TradingView charts also show 2024+ bars, which is this repo's holdout
+not evidence of an edge. On dev data (H1 2023, 5m, defaults) the Python port gives 1,345 trades at -$22.44/trade after
+the $4.02 TopstepX commission (about -$18/trade before costs). TradingView charts also show 2024+ bars, which is this repo's holdout
 period: numbers read there are not a clean test.
 
 ## Install
@@ -32,7 +32,7 @@ period: numbers read there are not a clean test.
 |---|---|---|
 | Detection | wick tolerance, min range, **directional**, volume label | 0 ticks, 1 tick, on, on |
 | Levels | bars before retest, max age, max levels per side, reset each session | 1, 100, 20, on |
-| Trade | swing left / right bars, stop buffer, max risk, **reward:risk**, flat at session end, contracts, cost | 5 / 2, 0, off, 1.1, on, 1, $24.02 |
+| Trade | swing left / right bars, stop buffer, max risk, **reward:risk**, flat at session end, contracts, cost | 5 / 2, 0, off, 1.1, on, 1, $4.02 |
 | Filters | MA ribbon (EMA/SMA 8-13-21-34-55, Stacked or Price vs slowest), Supertrend (3, 10) | off, off |
 
 Fill model (conservative, `SPEC.md` sections 3-4): entry needs a 1-tick trade-through of the level or fills at

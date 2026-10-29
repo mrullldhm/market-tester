@@ -18,6 +18,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from ..common.config import SLIPPAGE_TICKS_PER_SIDE
 from .engine import Market, run, with_costs
 from .metrics import daily, trading_days
 
@@ -91,7 +92,7 @@ def _one(j: int):
     return j, d["pnl"].to_numpy(float), d["n"].to_numpy(np.int64)
 
 
-def run_grid(strategy, bars: pd.DataFrame, grid: dict, slip_ticks: float = 1, n_jobs: int = 1,
+def run_grid(strategy, bars: pd.DataFrame, grid: dict, slip_ticks: float = SLIPPAGE_TICKS_PER_SIDE, n_jobs: int = 1,
              market: Market | None = None, progress: bool = True) -> GridResult:
     configs = grid_configs(grid)
     days = trading_days(bars)

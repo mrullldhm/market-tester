@@ -13,9 +13,11 @@
 - **Codex gate:** Claude builds; Codex reviews and independently replicates (`AGENTS.md`) before any result is
   called real. Give Codex a hashed pytest log, never ask it to run pytest.
 - Before the first strategy test: write down the holdout period and log every look at it.
-- Quantum costs: $4.02 fee round trip + 1 tick slippage per side = $24.02 round trip on 1 CL. Stop and target
-  in the same minute = stop (quantum only).
-- TradingView tester: $50,000 account, 1 CL, commission $2.01 per order ($4.02 round trip, TopstepX), slippage
-  0 + 1-tick stress, TV broker emulator fills (intrabar path). Flat by 16:10 ET (Topstep 3:10 PM CT).
+- **Costs (both testers): TopstepX CL commission, 1 contract = $4.02 round trip ($2.01 per side).** That is the
+  only cost in the baseline; slippage is 0 by default. A 1-tick-per-side slippage stress ($20 more per round
+  trip with two market fills) is always reported separately (quantum: a gate). Never call $24.02 "commission".
+- Quantum: stop and target in the same minute = stop; target needs a 1-tick trade-through.
+- TradingView tester: $50,000 account, 1 CL, TV broker emulator fills (intrabar path). Flat by 16:10 ET
+  (Topstep 3:10 PM CT).
 - Both: roll jumps are never P&L; a trade must not span two `raw_symbol`s.
 - Long jobs print live progress.
